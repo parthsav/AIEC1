@@ -86,20 +86,31 @@ Run the notebook sections that:
 
 Why is metadata important for a RAG application?
 
-##### ✅ Answer:
+##### ✅ Answer: 
+- Metadata can be useful when it wants to site source (information can be from multiple sources)
+- Filter before search : if you have same document like let's say employment_handbook from 2025 and 2026, metadata can be useful and pulling information from the latest source
 
 #### ❓Question #3
 
 What tradeoff do we make when choosing chunk size and chunk overlap?
 
 ##### ✅ Answer:
+- Large chunk size
+	- expensive (more token usage)
+	- may end up including stuff not relevant to the question asked
+- Small chunk size 
+	- you miss context (retriever may think to bring chunk 1 and chunk 3 but then it doesn't bring chunk 2 which might be important to paint the full picture)
+- Chunk Overlap
+	- duplication of data : larger chunk overlap will consume too much memory whereas smaller chunk overlap will lose meaning between chunks 
 
 #### ❓Question #4
 
 What does a similarity score help you understand, and what does it not prove by itself?
 
 ##### ✅ Answer:
-
+- It only helps you understand how close two pieces of text are to each other. It doesn't tell you that the chunk has the correct answer
+- Similarity score to me is like asking Google maps, pizza places near me, it list 3 or 4 but it doesn't really answer best pizza place is Paul's pizza
+- Similarity score is basically saying it's likely relevant and here's the hint (score). 
 ---
 
 ## 🏗️ Activity #3: Vibe Check Retrieval Quality
@@ -114,7 +125,8 @@ Run the notebook's vibe check queries and inspect both:
 For the vibe check queries, did the retrieved context seem relevant before generation? Why or why not?
 
 ##### ✅ Answer:
-
+- For couple of questions it retrieved really high scores like around 0.5 and up but for couple of other questions it gave 0.30-0.40 even when nothing matched 
+- As we discussed above, it finds closest not complete answers to the questions 
 ---
 
 ## 🏗️ Activity #4: Tune Retrieval
@@ -130,13 +142,23 @@ Document what changed and whether retrieval improved.
 
 ##### Settings Changed:
 
--
+For my testing i tried this question : What symptoms should make me call a veterinarian?
 
-##### Results:
+so i tried a few settings 
+Before: 
+chunk_size = 1000
+chunk_overlap = 200
+answer_k = 4
 
-1.
-2.
-3.
+After: 
+chunk_size = 500
+chunk_overlap = 100
+answer_k = 6
+
+The retrieval scores dropped. 
+The answer got worse than before. i noticed the score drop where i feel like it was losing a lot of context needed to come up with the right answer
+The goal with the above was to see if making it smaller made the results better but it didn't. the answer felt more fragmented than Before's output
+
 
 ---
 
