@@ -68,7 +68,7 @@ You will compare embeddings for terms like:
 Why is cosine similarity useful for dense vector retrieval?
 
 ##### ✅ Answer:
-
+Cosine similarity measures how two pieces of text are by converting them into vectors and then measuring the angle between those vectors. Small angle means they are about similar things and large angle means they're not. That's how it's useful for dense vector retrieval because when you send a query, it will pull all the information with the smallest angle (most similar direction) to your query vector and return those as the top results.
 ---
 
 ## 🏗️ Activity #2: Build the Vector RAG Pipeline
