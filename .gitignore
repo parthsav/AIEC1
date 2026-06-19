@@ -7,3 +7,9 @@ __pycache__/
 .venv
 uv.lock
 workspace
+05_Synthetic_Data_Generation_for_RAG_Evals/.idea/.gitignore
+05_Synthetic_Data_Generation_for_RAG_Evals/.idea/05_Synthetic_Data_Generation_for_RAG_Evals.iml
+05_Synthetic_Data_Generation_for_RAG_Evals/.idea/misc.xml
+05_Synthetic_Data_Generation_for_RAG_Evals/.idea/modules.xml
+05_Synthetic_Data_Generation_for_RAG_Evals/.idea/vcs.xml
+05_Synthetic_Data_Generation_for_RAG_Evals/.idea/inspectionProfiles/profiles_settings.xml
