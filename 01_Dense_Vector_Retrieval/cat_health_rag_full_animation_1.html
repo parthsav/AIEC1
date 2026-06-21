@@ -1,0 +1,1567 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cat Health RAG — Full Animation</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#0d1117;color:#e6edf3;font-family:'Courier New',monospace;font-size:12px;min-height:100vh;display:flex;flex-direction:column}
+#topbar{background:#161b22;border-bottom:1px solid #21262d;padding:10px 16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;flex-shrink:0}
+#topbar .title{color:#f0883e;font-weight:bold;font-size:13px;white-space:nowrap}
+#task-pills{display:flex;gap:6px;flex-wrap:wrap}
+.pill{padding:4px 10px;border-radius:12px;cursor:pointer;font-size:10px;border:1px solid #30363d;background:transparent;color:#8b949e;font-family:'Courier New',monospace;transition:all .2s}
+.pill.active{background:#0e4429;color:#3fb950;border-color:#3fb950}
+.pill.done{background:#1a3a5c;color:#58a6ff;border-color:#58a6ff}
+#controls{background:#161b22;border-bottom:1px solid #21262d;padding:8px 16px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;flex-shrink:0}
+button{font-family:'Courier New',monospace;font-size:11px;padding:6px 12px;border-radius:5px;cursor:pointer;transition:all .15s;border:none}
+.btn-green{background:#0e4429;color:#3fb950;border:1px solid #3fb950}
+.btn-green:hover{background:#1a5c35}
+.btn-blue{background:#0c2d6b;color:#58a6ff;border:1px solid #58a6ff}
+.btn-blue:hover{background:#1a4a8a}
+.btn-grey{background:transparent;color:#8b949e;border:1px solid #30363d}
+.btn-grey:hover{background:#21262d}
+.btn-orange{background:#3d2200;color:#f0883e;border:1px solid #f0883e}
+.btn-orange:hover{background:#5a3200}
+#speed-wrap{display:flex;align-items:center;gap:6px;color:#8b949e;font-size:10px}
+#speed{width:80px;accent-color:#f0883e}
+#progress-bar{flex:1;height:6px;background:#21262d;border-radius:3px;overflow:hidden;min-width:80px}
+#progress-fill{height:100%;background:linear-gradient(90deg,#3fb950,#58a6ff);border-radius:3px;transition:width .3s}
+#step-counter{color:#8b949e;font-size:10px;white-space:nowrap}
+#main{display:flex;flex:1;overflow:hidden;min-height:0}
+#sidebar{width:240px;flex-shrink:0;background:#161b22;border-right:1px solid #21262d;overflow-y:auto;padding:10px;display:flex;flex-direction:column;gap:10px}
+.sidebar-section{background:#0d1117;border:1px solid #21262d;border-radius:6px;padding:8px}
+.sidebar-title{color:#8b949e;font-size:10px;letter-spacing:.05em;margin-bottom:6px;text-transform:uppercase}
+.task-item{padding:5px 8px;border-radius:4px;cursor:pointer;border:1px solid transparent;color:#8b949e;font-size:10px;margin-bottom:3px;transition:all .2s}
+.task-item.active{color:#f0883e;border-color:#f0883e;background:rgba(240,136,62,.07)}
+.task-item.done{color:#3fb950;border-color:#3fb950;background:rgba(63,185,80,.05)}
+.field-card{background:#1c2330;border-radius:4px;margin-bottom:4px;overflow:hidden;border:1px solid #21262d;transition:border-color .3s,box-shadow .3s}
+.field-card.dirty{border-color:#f0883e;box-shadow:0 0 6px rgba(240,136,62,.4)}
+.field-card.set{border-color:#58a6ff;box-shadow:0 0 4px rgba(88,166,255,.2)}
+.field-card.warn{border-color:#ff7b72;box-shadow:0 0 6px rgba(255,123,114,.3)}
+.field-top{display:flex;justify-content:space-between;padding:3px 6px;font-size:9px;color:#8b949e}
+.field-badge{font-size:8px;padding:1px 4px;border-radius:3px;background:#21262d;color:#8b949e}
+.field-val{padding:2px 6px 4px;font-size:10px;color:#79c0ff;word-break:break-all}
+.field-val.empty{color:#30363d;font-style:italic}
+#canvas-wrap{flex:1;padding:10px;display:flex;flex-direction:column;gap:8px;overflow:hidden;min-width:0}
+#canvas{border-radius:8px;background:#0a0e14;display:block;max-width:100%}
+#desc-panel{background:#161b22;border:1px solid #21262d;border-radius:8px;padding:10px 14px;font-size:11px;line-height:1.8;color:#e6edf3;min-height:64px;flex-shrink:0}
+#desc-panel strong{color:#3fb950}
+#desc-panel code{font-family:'Courier New',monospace;font-size:10px;color:#79c0ff;background:rgba(88,166,255,.08);padding:1px 4px;border-radius:3px}
+#desc-panel em{color:#f0883e}
+#log-panel{background:#0d1117;border:1px solid #21262d;border-radius:6px;height:90px;overflow-y:auto;flex-shrink:0}
+#log-body{padding:4px 8px}
+.log-line{font-size:10px;padding:1px 0;display:flex;gap:6px}
+.log-line .ts{color:#30363d;flex-shrink:0}
+.log-line.info .msg{color:#e6edf3}
+.log-line.data .msg{color:#f0883e}
+.log-line.node .msg{color:#3fb950}
+.log-line.edge .msg{color:#bc8cff}
+.log-line.tool .msg{color:#58a6ff}
+.log-line.warn .msg{color:#ff7b72}
+.log-line.metric .msg{color:#bc8cff}
+.log-line.ok .msg{color:#3fb950}
+#obj-label{font-size:10px;color:#f0883e;margin-bottom:4px;font-weight:bold}
+</style>
+</head>
+<body>
+
+<div id="topbar">
+  <span class="title">🐱 Cat Health RAG — Interactive Walkthrough</span>
+  <div id="task-pills">
+    <button class="pill" onclick="jumpTask(0)">Goal</button>
+    <button class="pill" onclick="jumpTask(1)">T1: Setup</button>
+    <button class="pill" onclick="jumpTask(2)">T2: Embeddings</button>
+    <button class="pill" onclick="jumpTask(3)">T3: Load PDF</button>
+    <button class="pill" onclick="jumpTask(4)">T4: Chunking</button>
+    <button class="pill" onclick="jumpTask(5)">T5: Qdrant</button>
+    <button class="pill" onclick="jumpTask(6)">T6: Retrieval</button>
+    <button class="pill" onclick="jumpTask(7)">T7: RAG</button>
+    <button class="pill" onclick="jumpTask(8)">Activity</button>
+  </div>
+</div>
+
+<div id="controls">
+  <button class="btn-green" onclick="doStep()">STEP →</button>
+  <button class="btn-orange" id="play-btn" onclick="togglePlay()">▶ PLAY</button>
+  <button class="btn-grey" onclick="doReset()">↺ RESET</button>
+  <button class="btn-grey" onclick="doPrev()">◀ PREV</button>
+  <button class="btn-blue" onclick="doNext()">NEXT ▶</button>
+  <div id="speed-wrap">
+    Speed <input type="range" id="speed" min="1" max="5" value="2"> Fast
+  </div>
+  <div id="progress-bar"><div id="progress-fill" style="width:0%"></div></div>
+  <span id="step-counter">0 / 0</span>
+</div>
+
+<div id="main">
+  <div id="sidebar">
+    <div class="sidebar-section">
+      <div class="sidebar-title">Tasks</div>
+      <div class="task-item" onclick="jumpTask(0)">🎯 Notebook Goal</div>
+      <div class="task-item" onclick="jumpTask(1)">T1: Environment Setup</div>
+      <div class="task-item" onclick="jumpTask(2)">T2: Embedding Primer</div>
+      <div class="task-item" onclick="jumpTask(3)">T3: Load PDF</div>
+      <div class="task-item" onclick="jumpTask(4)">T4: Chunking</div>
+      <div class="task-item" onclick="jumpTask(5)">T5: Embed + Qdrant</div>
+      <div class="task-item" onclick="jumpTask(6)">T6: Retrieval Scores</div>
+      <div class="task-item" onclick="jumpTask(7)">T7: RAG Generation</div>
+      <div class="task-item" onclick="jumpTask(8)">🔬 Activity: Tune</div>
+    </div>
+    <div class="sidebar-section">
+      <div class="sidebar-title">Object Inspector</div>
+      <div id="obj-label">—</div>
+      <div id="inspector"></div>
+    </div>
+  </div>
+
+  <div id="canvas-wrap">
+    <canvas id="canvas"></canvas>
+    <div id="desc-panel">Press <strong>STEP →</strong> or <strong>▶ PLAY</strong> to begin.</div>
+    <div id="log-panel"><div id="log-body"></div></div>
+  </div>
+</div>
+
+<script>
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+const canvasWrap = document.getElementById('canvas-wrap');
+let CW = 800, CH = 340;
+const SIM = {};
+
+function setupCanvas() {
+  const d = window.devicePixelRatio || 1;
+  const rect = canvasWrap.getBoundingClientRect();
+  const w = Math.max(400, rect.width - 20);
+  CW = w;
+  canvas.width = w * d;
+  canvas.height = CH * d;
+  canvas.style.width = w + 'px';
+  canvas.style.height = CH + 'px';
+  ctx.scale(d, d);
+  if (currentStep >= 0) renderCurrent();
+}
+window.addEventListener('resize', setupCanvas);
+
+// Drawing primitives
+function clr() { ctx.clearRect(0, 0, CW, CH); }
+function grid() {
+  ctx.save();
+  ctx.strokeStyle = '#0f1520'; ctx.lineWidth = 1;
+  for (let x = 0; x < CW; x += 40) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, CH); ctx.stroke(); }
+  for (let y = 0; y < CH; y += 40) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(CW, y); ctx.stroke(); }
+  ctx.restore();
+}
+function rr(ctx2, x, y, w, h, r) {
+  ctx2.beginPath();
+  ctx2.moveTo(x+r,y); ctx2.lineTo(x+w-r,y);
+  ctx2.quadraticCurveTo(x+w,y,x+w,y+r);
+  ctx2.lineTo(x+w,y+h-r); ctx2.quadraticCurveTo(x+w,y+h,x+w-r,y+h);
+  ctx2.lineTo(x+r,y+h); ctx2.quadraticCurveTo(x,y+h,x,y+h-r);
+  ctx2.lineTo(x,y+r); ctx2.quadraticCurveTo(x,y,x+r,y);
+  ctx2.closePath();
+}
+function box(x, y, w, h, {fill='#1c2330', stroke='#30363d', r=6, glow=null, lw=1.5}={}) {
+  ctx.save();
+  if (glow) { ctx.shadowColor = glow; ctx.shadowBlur = 14; }
+  rr(ctx, x, y, w, h, r);
+  ctx.fillStyle = fill; ctx.fill();
+  ctx.strokeStyle = stroke; ctx.lineWidth = lw;
+  ctx.stroke();
+  ctx.restore();
+}
+function lbl(text, x, y, {color='#e6edf3', size=11, bold=false, align='center', max=0}={}) {
+  ctx.save();
+  ctx.font = (bold?'bold ':'')+size+'px "Courier New",monospace';
+  ctx.fillStyle = color; ctx.textAlign = align; ctx.textBaseline = 'middle';
+  if (max && ctx.measureText(text).width > max) {
+    while (text.length > 3 && ctx.measureText(text+'…').width > max) text = text.slice(0,-1);
+    text += '…';
+  }
+  ctx.fillText(text, x, y);
+  ctx.restore();
+}
+function arw(x1, y1, x2, y2, {color='#30363d', active=false, lw=1.5, dash=[]}={}) {
+  ctx.save();
+  if (active) { ctx.shadowColor = color; ctx.shadowBlur = 8; }
+  ctx.strokeStyle = color; ctx.lineWidth = lw; ctx.setLineDash(dash);
+  ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+  const angle = Math.atan2(y2-y1, x2-x1);
+  const hs = 7;
+  ctx.fillStyle = color; ctx.setLineDash([]);
+  ctx.beginPath();
+  ctx.moveTo(x2, y2);
+  ctx.lineTo(x2 - hs*Math.cos(angle-0.4), y2 - hs*Math.sin(angle-0.4));
+  ctx.lineTo(x2 - hs*Math.cos(angle+0.4), y2 - hs*Math.sin(angle+0.4));
+  ctx.closePath(); ctx.fill();
+  ctx.restore();
+}
+function pkt(x, y, text, color='#f0883e', r=14) {
+  ctx.save();
+  ctx.shadowColor = color; ctx.shadowBlur = 10;
+  ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI*2);
+  ctx.fillStyle = color+'33'; ctx.fill();
+  ctx.strokeStyle = color; ctx.lineWidth = 2; ctx.stroke();
+  ctx.restore();
+  lbl(text, x, y, {color, size:9, bold:true});
+}
+
+// Execution log
+let logTs = 0;
+function addLog(type, msg) {
+  const lb = document.getElementById('log-body');
+  const d = document.createElement('div');
+  d.className = `log-line ${type}`;
+  logTs++;
+  d.innerHTML = `<span class="ts">[${String(logTs).padStart(3,'0')}]</span><span class="msg">${msg}</span>`;
+  lb.appendChild(d);
+  lb.scrollTop = lb.scrollHeight;
+}
+
+// Object inspector
+function setInspector(label, fields) {
+  document.getElementById('obj-label').textContent = label || '—';
+  const el = document.getElementById('inspector');
+  el.innerHTML = '';
+  if (!fields) return;
+  fields.forEach(({k, v, s=''}) => {
+    const card = document.createElement('div');
+    card.className = `field-card ${s}`;
+    card.innerHTML = `<div class="field-top"><span>${k}</span><span class="field-badge">${s||'empty'}</span></div><div class="field-val${!v?' empty':''}">${v||'—'}</div>`;
+    el.appendChild(card);
+    if (s==='dirty') { setTimeout(()=>{card.classList.remove('dirty');card.classList.add('set');card.querySelector('.field-badge').textContent='set';},500); }
+  });
+}
+
+// Step system
+let allTasks = [];
+let currentTask = -1;
+let currentStep = -1;
+let playTimer = null;
+let isPlaying = false;
+
+function buildAllTasks() {
+  allTasks = [
+    buildTask0(),
+    buildTask1(),
+    buildTask2(),
+    buildTask3(),
+    buildTask4(),
+    buildTask5(),
+    buildTask6(),
+    buildTask7(),
+    buildTask8()
+  ];
+}
+
+function totalSteps() {
+  return allTasks.reduce((s,t) => s+t.steps.length, 0);
+}
+function globalStepIdx() {
+  let g = 0;
+  for (let i = 0; i < currentTask; i++) g += allTasks[i].steps.length;
+  return g + currentStep;
+}
+
+function jumpTask(ti) {
+  if (currentTask >= 0 && currentTask < allTasks.length) {
+    const ct = allTasks[currentTask];
+    if (currentStep >= 0 && currentStep < ct.steps.length && ct.steps[currentStep].onLeave) ct.steps[currentStep].onLeave();
+  }
+  if (SIM._timer) { clearInterval(SIM._timer); SIM._timer = null; }
+  currentTask = ti;
+  currentStep = -1;
+  updateTaskUI();
+  clearInspector();
+  clr(); grid();
+  document.getElementById('desc-panel').innerHTML = `<strong>${allTasks[ti].name}</strong> — press <strong>STEP →</strong> to begin.`;
+}
+
+function clearInspector() { setInspector('—', []); }
+
+function doStep() {
+  if (currentTask < 0) { jumpTask(0); return; }
+  const task = allTasks[currentTask];
+  if (currentStep >= 0 && currentStep < task.steps.length && task.steps[currentStep].onLeave) task.steps[currentStep].onLeave();
+  currentStep++;
+  if (currentStep >= task.steps.length) {
+    // mark task done, go next
+    if (currentTask < allTasks.length - 1) {
+      jumpTask(currentTask + 1);
+      doStep();
+    } else {
+      currentStep = task.steps.length - 1;
+    }
+    return;
+  }
+  execStep(task.steps[currentStep]);
+  updateTaskUI();
+  updateProgress();
+}
+
+function execStep(step) {
+  clr(); grid();
+  step.render();
+  if (step.log) addLog(step.log.t, step.log.m);
+  if (step.desc) document.getElementById('desc-panel').innerHTML = step.desc;
+  if (step.obj) setInspector(step.obj.label, step.obj.fields);
+  if (step.onEnter) step.onEnter();
+}
+
+function renderCurrent() {
+  if (currentTask < 0 || currentStep < 0) return;
+  const task = allTasks[currentTask];
+  if (currentStep < task.steps.length) {
+    clr(); grid();
+    task.steps[currentStep].render();
+  }
+}
+
+function doPrev() {
+  if (currentTask < 0) return;
+  if (currentStep > 0) {
+    const task = allTasks[currentTask];
+    if (task.steps[currentStep].onLeave) task.steps[currentStep].onLeave();
+    currentStep--;
+    execStep(task.steps[currentStep]);
+  } else if (currentTask > 0) {
+    jumpTask(currentTask - 1);
+    currentStep = allTasks[currentTask].steps.length - 1;
+    execStep(allTasks[currentTask].steps[currentStep]);
+  }
+  updateTaskUI(); updateProgress();
+}
+function doNext() { doStep(); }
+function doReset() {
+  stopPlay();
+  if (SIM._timer) { clearInterval(SIM._timer); SIM._timer = null; }
+  for (let k in SIM) delete SIM[k];
+  logTs = 0;
+  document.getElementById('log-body').innerHTML = '';
+  currentTask = -1; currentStep = -1;
+  clearInspector();
+  clr(); grid();
+  document.getElementById('desc-panel').innerHTML = 'Press <strong>STEP →</strong> or <strong>▶ PLAY</strong> to begin.';
+  updateTaskUI(); updateProgress();
+}
+function togglePlay() {
+  if (isPlaying) stopPlay();
+  else startPlay();
+}
+function startPlay() {
+  isPlaying = true;
+  document.getElementById('play-btn').textContent = '⏸ PAUSE';
+  document.getElementById('play-btn').className = 'btn-orange';
+  const delay = () => Math.max(400, 2200 - parseInt(document.getElementById('speed').value) * 360);
+  playTimer = setInterval(() => {
+    const lastTask = currentTask === allTasks.length - 1;
+    const lastStep = currentTask >= 0 && currentStep >= allTasks[currentTask].steps.length - 1;
+    if (lastTask && lastStep) { stopPlay(); return; }
+    doStep();
+  }, delay());
+}
+function stopPlay() {
+  isPlaying = false;
+  clearInterval(playTimer);
+  document.getElementById('play-btn').textContent = '▶ PLAY';
+  document.getElementById('play-btn').className = 'btn-orange';
+}
+function updateTaskUI() {
+  const pills = document.querySelectorAll('.pill');
+  const items = document.querySelectorAll('.task-item');
+  pills.forEach((p,i) => { p.className = 'pill' + (i===currentTask?' active':(i<currentTask?' done':'')); });
+  items.forEach((it,i) => { it.className = 'task-item' + (i===currentTask?' active':(i<currentTask?' done':'')); });
+}
+function updateProgress() {
+  const g = globalStepIdx() + 1;
+  const t = totalSteps();
+  document.getElementById('progress-fill').style.width = (t > 0 ? (g/t*100) : 0) + '%';
+  document.getElementById('step-counter').textContent = g + ' / ' + t;
+}
+
+// ─────────────────── TASK 0: NOTEBOOK GOAL ───────────────────
+function buildTask0() {
+  return { name:'🎯 Notebook Goal', steps: [
+    { // step 0: what is RAG
+      render() {
+        clr(); grid();
+        const cx = CW/2, cy = CH/2;
+        // Title
+        lbl('What is RAG — and why does it matter?', cx, 28, {color:'#f0883e', size:14, bold:true});
+
+        // Three boxes: Problem → RAG Pipeline → Benefit
+        const bw = Math.min(160, CW*0.22), bh = 80, gap = Math.min(60, CW*0.1);
+        const x0 = cx - bw - gap - bw/2, x1 = cx - bw/2, x2 = cx + bw/2 + gap;
+        const by = cy - bh/2 + 10;
+
+        // Problem box
+        box(x0, by, bw, bh, {fill:'#2d1010', stroke:'#ff7b72', glow:'#ff7b72'});
+        lbl('❌ Problem', x0+bw/2, by+16, {color:'#ff7b72', size:11, bold:true});
+        lbl('GPT knows only', x0+bw/2, by+34, {color:'#8b949e', size:9});
+        lbl('training data.', x0+bw/2, by+46, {color:'#8b949e', size:9});
+        lbl('No cat PDF!', x0+bw/2, by+60, {color:'#ff7b72', size:9, bold:true});
+
+        // Arrow
+        arw(x0+bw, by+bh/2, x1-4, by+bh/2, {color:'#f0883e', active:true, lw:2});
+        lbl('solution', (x0+bw+x1)/2, by+bh/2-12, {color:'#f0883e', size:9});
+
+        // RAG box
+        box(x1, by, bw, bh, {fill:'#0e3a1a', stroke:'#3fb950', glow:'#3fb950'});
+        lbl('✅ RAG', x1+bw/2, by+16, {color:'#3fb950', size:11, bold:true});
+        lbl('Retrieve chunks', x1+bw/2, by+34, {color:'#8b949e', size:9});
+        lbl('from PDF →', x1+bw/2, by+46, {color:'#8b949e', size:9});
+        lbl('give to model', x1+bw/2, by+60, {color:'#58a6ff', size:9});
+
+        // Arrow
+        arw(x1+bw, by+bh/2, x2-4, by+bh/2, {color:'#3fb950', active:true, lw:2});
+        lbl('result', (x1+bw+x2)/2, by+bh/2-12, {color:'#3fb950', size:9});
+
+        // Benefit box
+        box(x2, by, bw, bh, {fill:'#0c2d6b', stroke:'#58a6ff', glow:'#58a6ff'});
+        lbl('💡 Outcome', x2+bw/2, by+16, {color:'#58a6ff', size:11, bold:true});
+        lbl('Grounded answers', x2+bw/2, by+34, {color:'#8b949e', size:9});
+        lbl('from real docs.', x2+bw/2, by+46, {color:'#8b949e', size:9});
+        lbl('Cites sources!', x2+bw/2, by+60, {color:'#3fb950', size:9});
+
+        // Analogy
+        lbl('Analogy: You\'re a student who got the exam questions ahead of time (PDF)', cx, by+bh+32, {color:'#bc8cff', size:10});
+        lbl('You look up answers in the notes → hand them to AI → AI writes the answer.', cx, by+bh+48, {color:'#8b949e', size:9});
+      },
+      log: {t:'info', m:'Notebook goal: build a Cat Health PDF question-answering system using RAG'},
+      desc: `<strong>What is RAG?</strong> Retrieval-Augmented Generation means we <em>retrieve</em> relevant text from a document, then <em>give it</em> to an AI to write an answer. Without RAG, the AI only knows what it was trained on — it has never seen your cat health PDF. With RAG, we look up the relevant pages for you, and the AI answers from those pages. <strong>Think of it like open-book exam</strong>: the AI is the student, your PDF is the textbook, and we mark the right pages before the exam starts.`,
+      obj: { label:'Notebook', fields:[
+        {k:'goal', v:'Cat Health Q&A system', s:'set'},
+        {k:'data_source', v:'cat_health_guidelines.pdf', s:'set'},
+        {k:'retrieval', v:'Dense vector search (Qdrant)', s:'set'},
+        {k:'generation', v:'GPT-5.4-mini via OpenAI', s:'set'},
+      ]}
+    },
+    { // step 1: pipeline overview
+      render() {
+        clr(); grid();
+        lbl('The 6-Step Pipeline We\'ll Build Today', CW/2, 22, {color:'#f0883e', size:13, bold:true});
+
+        const steps6 = [
+          {icon:'📄', name:'Load PDF', color:'#58a6ff', fill:'#0c2d6b', stroke:'#58a6ff'},
+          {icon:'✂️', name:'Chunk Text', color:'#bc8cff', fill:'#1a0e3a', stroke:'#bc8cff'},
+          {icon:'🔢', name:'Embed Chunks', color:'#f0883e', fill:'#3d2200', stroke:'#f0883e'},
+          {icon:'🗄️', name:'Store in Qdrant', color:'#3fb950', fill:'#0e3a1a', stroke:'#3fb950'},
+          {icon:'🔍', name:'Retrieve Top-K', color:'#ffa657', fill:'#3d2700', stroke:'#ffa657'},
+          {icon:'🤖', name:'Generate Answer', color:'#ff7b72', fill:'#2d1010', stroke:'#ff7b72'},
+        ];
+        const bw = Math.min(98, (CW - 40) / 6 - 8), bh = 72;
+        const totalW = steps6.length * bw + (steps6.length-1) * 12;
+        let sx = (CW - totalW) / 2;
+        const by = 65;
+
+        steps6.forEach((s, i) => {
+          box(sx, by, bw, bh, {fill:s.fill, stroke:s.stroke, glow:s.stroke, r:8});
+          lbl(s.icon, sx+bw/2, by+18, {size:16});
+          lbl(s.name, sx+bw/2, by+46, {color:s.color, size:9, bold:true, max:bw-4});
+          lbl('T'+(i+3>5?'5-7':i+3), sx+bw/2, by+62, {color:'#30363d', size:8});
+          if (i < steps6.length-1) {
+            arw(sx+bw+2, by+bh/2, sx+bw+10, by+bh/2, {color:'#30363d', lw:1.5});
+          }
+          sx += bw + 12;
+        });
+
+        // Example question flow
+        const ey = by + bh + 38;
+        lbl('Example: "What symptoms should make me call a vet?" →', CW/2, ey, {color:'#8b949e', size:10});
+        lbl('PDF loads  →  split pages  →  embed text  →  store  →  find top 4 chunks  →  GPT answers with citations', CW/2, ey+18, {color:'#58a6ff', size:9});
+
+        // Why this matters
+        box(20, ey+34, CW-40, 42, {fill:'#1c2330', stroke:'#30363d', r:6});
+        lbl('🎓 Why it matters: The AI\'s answer is only as good as what you retrieve. Better chunks + better search = better answers.', CW/2, ey+48, {color:'#e6edf3', size:10});
+        lbl('Each task in this notebook builds one piece of this pipeline.', CW/2, ey+64, {color:'#8b949e', size:9});
+      },
+      log: {t:'info', m:'Pipeline: Load → Chunk → Embed → Store → Retrieve → Generate'},
+      desc: `<strong>The 6-step pipeline</strong> we'll build, step by step. Every task in the notebook adds one piece: Task 3 loads the PDF, Task 4 cuts it into chunks, Task 5 converts those chunks to numbers and stores them, Task 6 retrieves the most relevant chunks for a question, and Task 7 passes them to GPT to generate a grounded answer. <em>Each step connects to the next — skip one and the whole pipeline breaks.</em>`,
+      obj: { label:'Pipeline Steps', fields:[
+        {k:'step_1', v:'Load PDF → Document[] objects', s:'set'},
+        {k:'step_2', v:'Chunk → splits[] (1000 chars, 200 overlap)', s:'set'},
+        {k:'step_3', v:'Embed → float[] per chunk via OpenAI', s:'set'},
+        {k:'step_4', v:'Store → Qdrant in-memory collection', s:'set'},
+        {k:'step_5', v:'Retrieve → top-k by cosine similarity', s:'set'},
+        {k:'step_6', v:'Generate → GPT with context in prompt', s:'set'},
+      ]}
+    }
+  ]};
+}
+
+// ─────────────────── TASK 1: ENVIRONMENT SETUP ───────────────────
+function buildTask1() {
+  return { name:'T1: Environment Setup', steps: [
+    {
+      render() {
+        clr(); grid();
+        lbl('T1: Imports — Loading the Tools We Need', CW/2, 22, {color:'#f0883e', size:13, bold:true});
+        lbl('← T0 gave us the big picture. Now we import the specific Python libraries.', CW/2, 40, {color:'#8b949e', size:9});
+
+        const pkgs = [
+          {name:'langchain_community', desc:'PyPDFLoader', color:'#58a6ff', fill:'#0c2d6b'},
+          {name:'langchain_text_splitters', desc:'RecursiveCharacter..', color:'#bc8cff', fill:'#1a0e3a'},
+          {name:'langchain_openai', desc:'ChatOpenAI + Embeddings', color:'#f0883e', fill:'#3d2200'},
+          {name:'langchain_qdrant', desc:'QdrantVectorStore', color:'#3fb950', fill:'#0e3a1a'},
+          {name:'langchain_core', desc:'Prompts + Parsers', color:'#ffa657', fill:'#3d2700'},
+          {name:'stdlib', desc:'pathlib, math, os, getpass', color:'#8b949e', fill:'#1c2330'},
+        ];
+
+        const cols = 3, rows = 2;
+        const bw = Math.min(170, (CW-40)/cols-10), bh = 50;
+        const totalW = cols*bw + (cols-1)*10;
+        const startX = (CW-totalW)/2;
+
+        pkgs.forEach((p, i) => {
+          const col = i % cols, row = Math.floor(i/cols);
+          const x = startX + col*(bw+10), y = 60 + row*(bh+10);
+          box(x, y, bw, bh, {fill:p.fill, stroke:p.color, r:6});
+          lbl(p.name, x+bw/2, y+16, {color:p.color, size:9, bold:true, max:bw-8});
+          lbl(p.desc, x+bw/2, y+34, {color:'#8b949e', size:8, max:bw-8});
+        });
+
+        // LangChain box connecting all
+        const lcY = 60 + 2*(bh+10) + 12;
+        box(CW/2 - 120, lcY, 240, 36, {fill:'#1c2330', stroke:'#f0883e', glow:'#f0883e', r:8});
+        lbl('LangChain v1 — Modular AI Pipeline Framework', CW/2, lcY+12, {color:'#f0883e', size:10, bold:true});
+        lbl('"Each library is a LEGO brick. We snap them together to build the RAG pipeline."', CW/2, lcY+26, {color:'#8b949e', size:9});
+      },
+      log: {t:'node', m:'import: langchain_community, langchain_openai, langchain_qdrant, langchain_core'},
+      desc: `<strong>Task 1 — Environment Setup.</strong> We import 6 separate LangChain libraries. LangChain v1 splits functionality into focused packages — this is like a toolbox where each drawer has a specific tool. <code>langchain_community</code> has PDF loaders, <code>langchain_openai</code> has embedding + chat models, <code>langchain_qdrant</code> has the vector database connector. <em>Previous step (Goal): we knew what to build. Now we pick up the tools to build it.</em>`,
+      obj: { label:'Python Imports', fields:[
+        {k:'PyPDFLoader', v:'langchain_community', s:'set'},
+        {k:'RecursiveCharacterTextSplitter', v:'langchain_text_splitters', s:'set'},
+        {k:'OpenAIEmbeddings', v:'langchain_openai', s:'set'},
+        {k:'ChatOpenAI', v:'langchain_openai', s:'set'},
+        {k:'QdrantVectorStore', v:'langchain_qdrant', s:'set'},
+        {k:'ChatPromptTemplate', v:'langchain_core', s:'set'},
+      ]}
+    },
+    {
+      render() {
+        clr(); grid();
+        lbl('T1: API Key — Secure Credential Setup', CW/2, 22, {color:'#f0883e', size:13, bold:true});
+
+        // Flow: getpass → ENV var → OpenAI API
+        const y = CH/2 - 20;
+        const boxes = [
+          {x:CW*0.08, label:'getpass()', sub:'"OpenAI Key: "', fill:'#3d2200', stroke:'#f0883e', color:'#f0883e'},
+          {x:CW*0.35, label:'os.environ', sub:'OPENAI_API_KEY', fill:'#1a0e3a', stroke:'#bc8cff', color:'#bc8cff'},
+          {x:CW*0.62, label:'OpenAI API', sub:'🔑 Auth header', fill:'#0e3a1a', stroke:'#3fb950', color:'#3fb950'},
+        ];
+        const bw = 120, bh = 56;
+        boxes.forEach((b, i) => {
+          box(b.x, y-bh/2, bw, bh, {fill:b.fill, stroke:b.stroke, r:8});
+          lbl(b.label, b.x+bw/2, y-10, {color:b.color, size:11, bold:true});
+          lbl(b.sub, b.x+bw/2, y+10, {color:'#8b949e', size:9});
+          if (i < boxes.length-1) {
+            arw(b.x+bw+4, y, boxes[i+1].x-4, y, {color:'#f0883e', active:true, lw:2});
+          }
+        });
+
+        // Security note
+        box(20, y+50, CW-40, 44, {fill:'#1c2330', stroke:'#21262d', r:6});
+        lbl('🔒 Security: getpass() hides the key while you type — like a PIN entry at an ATM.', CW/2, y+66, {color:'#e6edf3', size:10});
+        lbl('It stores the key in os.environ (memory only, not written to disk or the notebook file).', CW/2, y+82, {color:'#8b949e', size:9});
+
+        // Conditional logic
+        const cy2 = y - 80;
+        box(CW/2-140, cy2, 280, 36, {fill:'#0c2d6b', stroke:'#58a6ff', r:6});
+        lbl('if not os.environ.get("OPENAI_API_KEY"):  →  ask for it', CW/2, cy2+18, {color:'#58a6ff', size:10});
+      },
+      log: {t:'tool', m:'OPENAI_API_KEY set in os.environ via getpass() — key never logged'},
+      desc: `<strong>API Key Setup.</strong> The code checks if <code>OPENAI_API_KEY</code> is already in environment variables. If not, it calls <code>getpass()</code> which prompts you to type the key — but hides each character like a password field. The key is stored in <code>os.environ</code> (process memory only, not the notebook file or disk). <em>Both OpenAI embedding calls and chat completions need this key — set it once, use it everywhere.</em>`,
+      obj: { label:'Environment', fields:[
+        {k:'OPENAI_API_KEY', v:'sk-... (hidden)', s:'set'},
+        {k:'storage', v:'os.environ (memory only)', s:'set'},
+        {k:'security', v:'getpass() — not echoed', s:'set'},
+      ]}
+    }
+  ]};
+}
+
+// ─────────────────── TASK 2: EMBEDDING SIMILARITY ───────────────────
+function buildTask2() {
+  return { name:'T2: Embedding Primer', steps: [
+    {
+      render() {
+        clr(); grid();
+        lbl('T2: What is an Embedding? — Text → Numbers', CW/2, 22, {color:'#f0883e', size:13, bold:true});
+        lbl('← T1 imported the tools. Now: what does OpenAIEmbeddings actually DO?', CW/2, 40, {color:'#8b949e', size:9});
+
+        // 2D meaning space visualization
+        const ox = CW * 0.30, oy = CH - 60;
+        const axLen = Math.min(CW * 0.55, 340), ayLen = 200;
+
+        // Axes
+        arw(ox, oy, ox+axLen, oy, {color:'#30363d', lw:1.5});
+        arw(ox, oy, ox, oy-ayLen, {color:'#30363d', lw:1.5});
+        lbl('→ "animal" meaning', ox+axLen/2, oy+16, {color:'#30363d', size:9});
+        lbl('↑ "royalty"', ox-36, oy-ayLen/2, {color:'#30363d', size:9});
+
+        // Points in meaning space
+        const pts = [
+          {name:'king',  x:0.55, y:0.82, color:'#58a6ff'},
+          {name:'queen', x:0.50, y:0.78, color:'#58a6ff'},
+          {name:'cat',   x:0.85, y:0.18, color:'#3fb950'},
+          {name:'vet',   x:0.78, y:0.22, color:'#3fb950'},
+          {name:'banana',x:0.15, y:0.08, color:'#ff7b72'},
+          {name:'cat health\nguidelines', x:0.80, y:0.28, color:'#ffa657'},
+        ];
+
+        pts.forEach(p => {
+          const px = ox + p.x * axLen, py = oy - p.y * ayLen;
+          ctx.save();
+          ctx.shadowColor = p.color; ctx.shadowBlur = 8;
+          ctx.beginPath(); ctx.arc(px, py, 6, 0, Math.PI*2);
+          ctx.fillStyle = p.color+'55'; ctx.fill();
+          ctx.strokeStyle = p.color; ctx.lineWidth = 2; ctx.stroke();
+          ctx.restore();
+          const lines = p.name.split('\n');
+          lines.forEach((line, i) => lbl(line, px+12, py - 6 + i*12, {color:p.color, size:9, align:'left'}));
+        });
+
+        // Similarity line king-queen
+        const k = pts[0], q = pts[1];
+        const kx = ox+k.x*axLen, ky = oy-k.y*ayLen;
+        const qx = ox+q.x*axLen, qy = oy-q.y*ayLen;
+        ctx.save(); ctx.strokeStyle='#58a6ff'; ctx.lineWidth=1.5; ctx.setLineDash([4,3]);
+        ctx.beginPath(); ctx.moveTo(kx,ky); ctx.lineTo(qx,qy); ctx.stroke(); ctx.restore();
+        lbl('sim=0.93', (kx+qx)/2+20, (ky+qy)/2, {color:'#58a6ff', size:8, bold:true});
+
+        // Score legend
+        const lx = 20, ly = 60;
+        box(lx, ly, 130, 100, {fill:'#1c2330', stroke:'#21262d', r:6});
+        lbl('Similarity Scores', lx+65, ly+14, {color:'#8b949e', size:9});
+        [['king ↔ queen','0.93','#3fb950'],['cat ↔ vet','0.73','#58a6ff'],['cat ↔ cat health','0.61','#ffa657'],['king ↔ banana','0.20','#ff7b72']].forEach(([pair,score,c],i) => {
+          lbl(pair, lx+8, ly+30+i*18, {color:'#8b949e', size:8, align:'left'});
+          lbl(score, lx+122, ly+30+i*18, {color:c, size:9, bold:true, align:'right'});
+        });
+      },
+      log: {t:'tool', m:'OpenAIEmbeddings(model="text-embedding-3-small") — calling API to embed words'},
+      desc: `<strong>What is an embedding?</strong> The model turns each word or sentence into a list of ~1500 numbers. Words with similar meanings end up with <em>similar numbers</em> — so "king" and "queen" land close together, while "banana" is far from both. This 2D map shows the idea visually (real embeddings have 1500 dimensions!). <strong>Cosine similarity</strong> measures how close two vectors are — score near 1.0 means very similar meaning, near 0.0 means unrelated. <em>This is the core of RAG retrieval.</em>`,
+      obj: { label:'OpenAIEmbeddings', fields:[
+        {k:'model', v:'text-embedding-3-small', s:'set'},
+        {k:'output_dims', v:'~1536 floats per text', s:'set'},
+        {k:'king ↔ queen', v:'0.93 (very close)', s:'set'},
+        {k:'cat ↔ veterinarian', v:'0.73 (related)', s:'set'},
+        {k:'king ↔ banana', v:'0.20 (unrelated)', s:'set'},
+      ]}
+    },
+    {
+      render() {
+        clr(); grid();
+        lbl('T2: Cosine Similarity — How We Measure "Closeness"', CW/2, 22, {color:'#f0883e', size:13, bold:true});
+
+        // Formula visualization
+        const fy = 70;
+        box(CW/2-200, fy, 400, 52, {fill:'#1c2330', stroke:'#bc8cff', glow:'#bc8cff33', r:8});
+        lbl('cosine_similarity(a, b)', CW/2, fy+14, {color:'#bc8cff', size:12, bold:true});
+        lbl('= dot_product(a,b) / ( magnitude(a) × magnitude(b) )', CW/2, fy+34, {color:'#79c0ff', size:10});
+
+        // Visual: two vectors as arrows
+        const ox = CW/2 - 60, oy = 175;
+        ctx.save();
+        // Vector a
+        ctx.strokeStyle = '#3fb950'; ctx.lineWidth = 2.5;
+        ctx.beginPath(); ctx.moveTo(ox, oy); ctx.lineTo(ox-50, oy-60); ctx.stroke();
+        lbl('a', ox-52, oy-66, {color:'#3fb950', size:11, bold:true});
+        // Vector b (close angle)
+        ctx.strokeStyle = '#58a6ff'; ctx.lineWidth = 2.5;
+        ctx.beginPath(); ctx.moveTo(ox, oy); ctx.lineTo(ox-10, oy-72); ctx.stroke();
+        lbl('b', ox-6, oy-80, {color:'#58a6ff', size:11, bold:true});
+        // Angle arc
+        ctx.strokeStyle = '#f0883e'; ctx.lineWidth = 1.5; ctx.setLineDash([]);
+        ctx.beginPath(); ctx.arc(ox, oy, 28, -Math.PI*0.8, -Math.PI*0.45); ctx.stroke();
+        lbl('θ small', ox-46, oy-16, {color:'#f0883e', size:9});
+        lbl('⇒ cos(θ) ≈ 0.93', ox-44, oy-2, {color:'#f0883e', size:9});
+        ctx.restore();
+
+        // Far vector example
+        const ox2 = CW/2 + 90, oy2 = 175;
+        ctx.save();
+        ctx.strokeStyle = '#3fb950'; ctx.lineWidth = 2.5;
+        ctx.beginPath(); ctx.moveTo(ox2, oy2); ctx.lineTo(ox2-50, oy2-60); ctx.stroke();
+        lbl('a', ox2-52, oy2-66, {color:'#3fb950', size:11, bold:true});
+        ctx.strokeStyle = '#ff7b72'; ctx.lineWidth = 2.5;
+        ctx.beginPath(); ctx.moveTo(ox2, oy2); ctx.lineTo(ox2+60, oy2-30); ctx.stroke();
+        lbl('b', ox2+66, oy2-30, {color:'#ff7b72', size:11, bold:true});
+        ctx.strokeStyle = '#f0883e'; ctx.lineWidth = 1.5;
+        ctx.beginPath(); ctx.arc(ox2, oy2, 28, -Math.PI*0.8, -Math.PI*0.1); ctx.stroke();
+        lbl('θ large', ox2-8, oy2-20, {color:'#f0883e', size:9});
+        lbl('⇒ cos(θ) ≈ 0.20', ox2-8, oy2-6, {color:'#ff7b72', size:9});
+        ctx.restore();
+
+        lbl('(king ↔ queen)', CW/2-80, oy2+20, {color:'#3fb950', size:9});
+        lbl('(king ↔ banana)', CW/2+90, oy2+20, {color:'#ff7b72', size:9});
+
+        // Application
+        box(20, CH-58, CW-40, 44, {fill:'#1c2330', stroke:'#30363d', r:6});
+        lbl('In RAG: we embed the user\'s question → find the PDF chunks whose vectors point in the same direction.', CW/2, CH-44, {color:'#e6edf3', size:10});
+        lbl('The chunks with highest cosine score = most relevant to the question. We return top-k of these.', CW/2, CH-28, {color:'#8b949e', size:9});
+      },
+      log: {t:'metric', m:'cosine_similarity: king↔queen=0.93 | cat↔vet=0.73 | king↔banana=0.20'},
+      desc: `<strong>Cosine Similarity</strong> measures the angle between two vectors. Small angle = pointing same direction = similar meaning. The formula normalizes for length, so a long paragraph and a short sentence can still be compared fairly. <strong>In RAG</strong>: the user's question is embedded, then compared against every stored PDF chunk. The 4 chunks with the <em>highest cosine scores</em> are retrieved and sent to the AI. <em>Connection to next step: before we can embed chunks, we need to load and chunk the PDF (Tasks 3 & 4).</em>`,
+      obj: { label:'cosine_similarity()', fields:[
+        {k:'formula', v:'dot(a,b) / (|a| × |b|)', s:'set'},
+        {k:'range', v:'0.0 (unrelated) → 1.0 (identical)', s:'set'},
+        {k:'use_in_rag', v:'rank PDF chunks for query', s:'set'},
+        {k:'score_heuristic', v:'>0.6 good, 0.3-0.5 weak, <0.3 noisy', s:'set'},
+      ]}
+    }
+  ]};
+}
+
+// ─────────────────── TASK 3: LOAD PDF ───────────────────
+function buildTask3() {
+  return { name:'T3: Load PDF', steps: [
+    {
+      render() {
+        clr(); grid();
+        lbl('T3: PyPDFLoader — PDF → Document Objects', CW/2, 22, {color:'#f0883e', size:13, bold:true});
+        lbl('← T2: we know HOW similarity works. Now: load the actual PDF to embed.', CW/2, 40, {color:'#8b949e', size:9});
+
+        // Pipeline: PDF file → PyPDFLoader → pages[] → filtered pages
+        const y = CH/2 - 10;
+        const items = [
+          {x:CW*0.05, label:'cat_health_\nguidelines.pdf', icon:'📄', color:'#8b949e', fill:'#1c2330', stroke:'#30363d', w:100},
+          {x:CW*0.27, label:'PyPDFLoader', icon:'⚙️', color:'#f0883e', fill:'#3d2200', stroke:'#f0883e', w:110},
+          {x:CW*0.52, label:'pages[]', icon:'📃', color:'#58a6ff', fill:'#0c2d6b', stroke:'#58a6ff', w:90},
+          {x:CW*0.73, label:'+ metadata', icon:'🏷️', color:'#bc8cff', fill:'#1a0e3a', stroke:'#bc8cff', w:90},
+          {x:CW*0.88, label:'filtered\npages', icon:'✅', color:'#3fb950', fill:'#0e3a1a', stroke:'#3fb950', w:80},
+        ];
+        const bh = 66;
+
+        items.forEach((it, i) => {
+          const lines = it.label.split('\n');
+          box(it.x, y-bh/2, it.w, bh, {fill:it.fill, stroke:it.stroke, r:8});
+          lbl(it.icon, it.x+it.w/2, y-14, {size:16});
+          lines.forEach((line, li) => lbl(line, it.x+it.w/2, y+8+li*13, {color:it.color, size:9, bold:true, max:it.w-6}));
+          if (i < items.length-1) {
+            const nx = items[i+1].x;
+            arw(it.x+it.w+2, y, nx-4, y, {color:'#f0883e', active:true, lw:2});
+          }
+        });
+
+        // Document anatomy
+        const dy = y + bh/2 + 28;
+        box(CW/2-180, dy, 360, 70, {fill:'#1c2330', stroke:'#30363d', r:6});
+        lbl('Document object anatomy:', CW/2, dy+12, {color:'#8b949e', size:10});
+        lbl('page_content: "The cat should receive annual vaccinations..."  (the actual text)', CW/2, dy+28, {color:'#79c0ff', size:9});
+        lbl('metadata: { source: "cat_health_guidelines.pdf", page: 0,', CW/2, dy+43, {color:'#bc8cff', size:9});
+        lbl('            document_type: "cat_health_guideline", start_index: 0 }', CW/2, dy+56, {color:'#bc8cff', size:9});
+      },
+      log: {t:'node', m:'PyPDFLoader.load() → extracted text from cat_health_guidelines.pdf'},
+      desc: `<strong>Task 3 — Document Loading.</strong> <code>PyPDFLoader</code> reads each PDF page and wraps it in a <code>Document</code> object with two parts: <code>page_content</code> (the actual text) and <code>metadata</code> (where it came from). We then <em>add extra metadata</em> — the source filename and document type — so we can cite sources later. Finally, we filter out blank pages. <strong>Think of each Document as a library card</strong>: the text is the book content, the metadata is the card catalog entry telling you where to find it. <em>Without metadata, we can't tell users which page the answer came from.</em>`,
+      obj: { label:'PyPDFLoader', fields:[
+        {k:'path', v:'data/cat_health_guidelines.pdf', s:'set'},
+        {k:'output', v:'pages[] — list of Document', s:'dirty'},
+        {k:'metadata.source', v:'cat_health_guidelines.pdf', s:'set'},
+        {k:'metadata.document_type', v:'cat_health_guideline', s:'set'},
+        {k:'filter', v:'skip blank pages', s:'set'},
+      ]}
+    },
+    {
+      render() {
+        clr(); grid();
+        lbl('T3: Document Object — What\'s Inside Each Page', CW/2, 22, {color:'#f0883e', size:13, bold:true});
+
+        // Large Document anatomy diagram
+        const bx = CW/2 - Math.min(280, CW*0.45), by = 55, bw = Math.min(560, CW*0.9), bh = 200;
+        box(bx, by, bw, bh, {fill:'#0c2d6b', stroke:'#58a6ff', glow:'#58a6ff33', r:10});
+        lbl('Document (one per PDF page)', bx+bw/2, by+16, {color:'#58a6ff', size:12, bold:true});
+
+        // page_content section
+        box(bx+12, by+30, bw-24, 68, {fill:'#1c2330', stroke:'#3fb950', r:6});
+        lbl('.page_content  (str)', bx+20, by+44, {color:'#3fb950', size:10, bold:true, align:'left'});
+        lbl('"Routine Health Care: Cats should receive an annual wellness', bx+bw/2, by+60, {color:'#79c0ff', size:9});
+        lbl(' exam. Vaccinations recommended include panleukopenia,', bx+bw/2, by+73, {color:'#79c0ff', size:9});
+        lbl(' calicivirus, rhinotracheitis, and rabies..."', bx+bw/2, by+86, {color:'#79c0ff', size:9});
+
+        // metadata section
+        box(bx+12, by+108, bw-24, 80, {fill:'#1c2330', stroke:'#bc8cff', r:6});
+        lbl('.metadata  (dict)', bx+20, by+122, {color:'#bc8cff', size:10, bold:true, align:'left'});
+        const mfields = [
+          ['source', '"cat_health_guidelines.pdf"'],
+          ['page', '0  (zero-indexed)'],
+          ['document_type', '"cat_health_guideline"'],
+          ['start_index', '0'],
+        ];
+        mfields.forEach(([k,v],i) => {
+          lbl(`  ${k}:`, bx+20, by+138+i*15, {color:'#8b949e', size:9, align:'left'});
+          lbl(v, bx+bw-14, by+138+i*15, {color:'#79c0ff', size:9, align:'right'});
+        });
+
+        // Why metadata matters
+        const wy = by + bh + 16;
+        box(CW/2-Math.min(200,CW*0.35), wy, Math.min(400,CW*0.7), 48, {fill:'#0e3a1a', stroke:'#3fb950', r:6});
+        lbl('Why metadata matters for RAG:', CW/2, wy+14, {color:'#3fb950', size:10, bold:true});
+        lbl('"The answer came from cat_health_guidelines.pdf, page 3" → users can verify it!', CW/2, wy+30, {color:'#8b949e', size:9});
+        lbl('Filter by metadata: "only search 2025 guidelines" (if you had multiple PDFs)', CW/2, wy+44, {color:'#8b949e', size:9});
+      },
+      log: {t:'data', m:'pages[0].page_content: "Routine Health Care: Cats should receive..." | metadata: {source, page, doc_type}'},
+      desc: `<strong>Document anatomy.</strong> Every <code>Document</code> object has exactly two fields: <code>page_content</code> (the raw text string from that PDF page) and <code>metadata</code> (a dictionary of context about the document). We manually add <code>source</code> and <code>document_type</code> to the metadata so the RAG system can cite sources. <em>The metadata flows all the way through to the final answer</em> — when the model says "[Source 1] cat_health_guidelines.pdf, page 3", that information came from here. <strong>Next step</strong>: these Documents are too long to embed directly — we need to cut them into smaller chunks (Task 4).`,
+      obj: { label:'Document (pages[0])', fields:[
+        {k:'page_content', v:'"Routine Health Care: Cats..."', s:'set'},
+        {k:'metadata.source', v:'cat_health_guidelines.pdf', s:'set'},
+        {k:'metadata.page', v:'0 (zero-indexed)', s:'set'},
+        {k:'metadata.document_type', v:'cat_health_guideline', s:'set'},
+        {k:'total_pages_loaded', v:'~N text-containing pages', s:'set'},
+      ]}
+    }
+  ]};
+}
+
+// ─────────────────── TASK 4: CHUNKING ───────────────────
+function buildTask4() {
+  return { name:'T4: Chunking', steps: [
+    {
+      render() {
+        clr(); grid();
+        lbl('T4: RecursiveCharacterTextSplitter — Cutting Pages into Chunks', CW/2, 22, {color:'#f0883e', size:13, bold:true});
+        lbl('← T3: we have Document objects (full pages). Problem: one full page = too much for one vector.', CW/2, 40, {color:'#8b949e', size:9});
+
+        // Splitter config box
+        const cfgX = 20, cfgY = 60, cfgW = Math.min(200, CW*0.28), cfgH = 110;
+        box(cfgX, cfgY, cfgW, cfgH, {fill:'#3d2200', stroke:'#f0883e', r:8});
+        lbl('RecursiveCharacter', cfgX+cfgW/2, cfgY+14, {color:'#f0883e', size:10, bold:true});
+        lbl('TextSplitter', cfgX+cfgW/2, cfgY+26, {color:'#f0883e', size:10, bold:true});
+        [['chunk_size','1000 chars'],['chunk_overlap','200 chars'],['add_start_index','True'],['strategy','paragraphs first']].forEach(([k,v],i) => {
+          lbl(k+':', cfgX+8, cfgY+46+i*16, {color:'#8b949e', size:9, align:'left'});
+          lbl(v, cfgX+cfgW-8, cfgY+46+i*16, {color:'#79c0ff', size:9, align:'right'});
+        });
+
+        // Source doc bar
+        const docX = cfgX+cfgW+16, docY = cfgY, docW = CW-docX-20, docH = 28;
+        box(docX, docY, docW, docH, {fill:'#0c2d6b', stroke:'#58a6ff', r:4});
+        lbl('📄 Full page text (e.g. 3000 characters)', docX+docW/2, docY+14, {color:'#58a6ff', size:10});
+
+        // Arrow down
+        arw(docX+docW/2, docY+docH+2, docX+docW/2, docY+docH+22, {color:'#f0883e', active:true, lw:2});
+        lbl('split_documents(pages)', docX+docW/2, docY+docH+12, {color:'#f0883e', size:9});
+
+        // Chunks row
+        const chunkY = docY+docH+30;
+        const nChunks = 5, chunkW = Math.min(70, (docW-10)/(nChunks)), chunkH = 36;
+        const overlapW = Math.floor(chunkW * 0.2);
+
+        for (let i = 0; i < nChunks; i++) {
+          const cx2 = docX + i*(chunkW+4), cy2 = chunkY;
+          box(cx2, cy2, chunkW, chunkH, {fill:'#0e3a1a', stroke:'#3fb950', r:4});
+          lbl(`chunk[${i}]`, cx2+chunkW/2, cy2+12, {color:'#3fb950', size:9, bold:true});
+          lbl('~1000', cx2+chunkW/2, cy2+26, {color:'#8b949e', size:8});
+          // Overlap zone (between chunks)
+          if (i < nChunks-1) {
+            box(cx2+chunkW-overlapW, cy2, overlapW+4+overlapW, chunkH, {fill:'#bc8cff33', stroke:'#bc8cff', r:2});
+          }
+        }
+        // Overlap label
+        lbl('Purple = 200-char overlap shared between adjacent chunks', docX+docW/2, chunkY+chunkH+16, {color:'#bc8cff', size:9});
+
+        // Why chunking matters
+        box(20, CH-56, CW-40, 44, {fill:'#1c2330', stroke:'#30363d', r:6});
+        lbl('Why 1000 chars? One embedding vector should represent ONE focused topic.', CW/2, CH-42, {color:'#e6edf3', size:10});
+        lbl('Why 200 overlap? So context at the boundary of chunks isn\'t lost — like a WAL (write-ahead log) tail.', CW/2, CH-26, {color:'#8b949e', size:9});
+      },
+      log: {t:'node', m:'RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200).split_documents(pages)'},
+      desc: `<strong>Task 4 — Chunking.</strong> A full PDF page can have 3,000+ characters on many different topics. If we embed a whole page, the resulting vector is a <em>blurry average</em> of all those topics — bad for retrieval. Instead, we cut each page into 1,000-character chunks. The <strong>200-character overlap</strong> means the last 200 chars of chunk[0] repeat at the start of chunk[1] — so a sentence crossing a boundary still appears intact in at least one chunk. <code>RecursiveCharacterTextSplitter</code> tries to cut at paragraph breaks first, then sentences, then hard character limits. <em>Next step: we embed each chunk individually.</em>`,
+      obj: { label:'RecursiveCharacterTextSplitter', fields:[
+        {k:'chunk_size', v:'1000 characters', s:'set'},
+        {k:'chunk_overlap', v:'200 characters', s:'set'},
+        {k:'add_start_index', v:'True', s:'set'},
+        {k:'input', v:'pages[] (full page Documents)', s:'set'},
+        {k:'output', v:'splits[] (focused chunks)', s:'dirty'},
+      ]}
+    },
+    {
+      render() {
+        clr(); grid();
+        lbl('T4: Chunk Size Tradeoffs — Why 1000/200?', CW/2, 22, {color:'#f0883e', size:13, bold:true});
+
+        // Tradeoff table
+        const tx = CW/2 - Math.min(260,CW*0.45), ty = 50, tw = Math.min(520,CW*0.9), rh = 38;
+        const headers = ['Setting', 'Too Small (500)', 'Just Right (1000)', 'Too Large (4000)'];
+        const rows2 = [
+          ['Context per chunk', '⚠️ Loses meaning', '✅ Focused topic', '❌ Blurry average'],
+          ['Retrieval quality', '⚠️ Fragmented', '✅ Relevant', '❌ Noisy context'],
+          ['Token cost', '✅ Cheap', '✅ Moderate', '❌ Expensive'],
+          ['Chunk count', '📈 More chunks', '🎯 Balanced', '📉 Fewer chunks'],
+        ];
+
+        const colW = tw / headers.length;
+        headers.forEach((h,i) => {
+          box(tx+i*colW, ty, colW-2, 26, {fill:'#1c2330', stroke:'#30363d', r:4});
+          lbl(h, tx+i*colW+colW/2-1, ty+13, {color:i===0?'#8b949e':i===1?'#ff7b72':i===2?'#3fb950':'#ff7b72', size:9, bold:true});
+        });
+
+        rows2.forEach((row, ri) => {
+          row.forEach((cell, ci) => {
+            const bg = ci===0?'#1c2330':ci===1?'#2d1010':ci===2?'#0e3a1a':'#2d1010';
+            box(tx+ci*colW, ty+26+ri*rh, colW-2, rh-2, {fill:bg, stroke:'#21262d', r:3});
+            lbl(cell, tx+ci*colW+colW/2-1, ty+26+ri*rh+rh/2-1, {color:ci===0?'#8b949e':ci===1?'#ff7b72':ci===2?'#3fb950':'#ff7b72', size:9, max:colW-8});
+          });
+        });
+
+        // Overlap visual
+        const oy = ty + 26 + rows2.length*rh + 20;
+        box(tx, oy, tw, 50, {fill:'#1c2330', stroke:'#bc8cff', r:6});
+        lbl('Overlap = 200 chars — the "context glue"', tx+tw/2, oy+14, {color:'#bc8cff', size:10, bold:true});
+        lbl('chunk[0]: "...cats need annual rabies vaccination [←200 chars]"', tx+tw/2, oy+29, {color:'#8b949e', size:9});
+        lbl('chunk[1]: "[200 chars→] vaccination is mandatory in most states..."', tx+tw/2, oy+43, {color:'#79c0ff', size:9});
+      },
+      log: {t:'data', m:`splits[] created — chunk_size=1000, chunk_overlap=200, N chunks total`},
+      desc: `<strong>Chunk size tradeoffs.</strong> 500 chars is too small — each chunk loses the surrounding context needed to make sense. 4000 chars is too large — the embedding vector becomes a blurry average of too many topics. 1000 chars hits a <em>sweet spot</em>: one focused topic per vector. The 200-char overlap is crucial: it prevents sentences from being cut in half between chunks. Think of it like a <strong>write-ahead log</strong> where the tail of one segment is copied to the start of the next — the boundary context is never truly lost. <em>The student's Activity experiment confirms: cutting to 500/100 made retrieval worse, not better.</em>`,
+      obj: { label:'splits[] — Chunked Documents', fields:[
+        {k:'total_chunks', v:'N chunks (from M pages)', s:'set'},
+        {k:'avg_chunk_size', v:'~1000 chars', s:'set'},
+        {k:'overlap_region', v:'200 chars between chunks', s:'set'},
+        {k:'metadata', v:'inherited from parent Document', s:'set'},
+        {k:'metadata.start_index', v:'char offset in original page', s:'set'},
+      ]}
+    }
+  ]};
+}
+
+// ─────────────────── TASK 5: EMBED + QDRANT ───────────────────
+function buildTask5() {
+  return { name:'T5: Embed + Qdrant', steps: [
+    {
+      render() {
+        clr(); grid();
+        lbl('T5: QdrantVectorStore — Embed Chunks + Store Vectors', CW/2, 22, {color:'#f0883e', size:13, bold:true});
+        lbl('← T4: splits[] are ready. Now embed each chunk and store the vectors.', CW/2, 40, {color:'#8b949e', size:9});
+
+        // Pipeline: splits[] → OpenAI API → vectors → Qdrant
+        const y = CH/2 - 20;
+        const stages = [
+          {label:'splits[]', sub:'N text chunks', icon:'📝', color:'#3fb950', fill:'#0e3a1a', stroke:'#3fb950'},
+          {label:'OpenAI\nEmbeddings', sub:'API call per batch', icon:'🔢', color:'#f0883e', fill:'#3d2200', stroke:'#f0883e'},
+          {label:'vectors[]', sub:'1536 floats each', icon:'📊', color:'#bc8cff', fill:'#1a0e3a', stroke:'#bc8cff'},
+          {label:'Qdrant\nCollection', sub:':memory: "cat_health"', icon:'🗄️', color:'#58a6ff', fill:'#0c2d6b', stroke:'#58a6ff'},
+        ];
+
+        const bw = Math.min(110, (CW - 40) / stages.length - 16), bh = 72;
+        const totalW = stages.length*bw + (stages.length-1)*24;
+        let sx = (CW-totalW)/2;
+
+        stages.forEach((s, i) => {
+          const lines = s.label.split('\n');
+          box(sx, y-bh/2, bw, bh, {fill:s.fill, stroke:s.stroke, glow:s.stroke, r:8});
+          lbl(s.icon, sx+bw/2, y-18, {size:18});
+          lines.forEach((line, li) => lbl(line, sx+bw/2, y+4+li*13, {color:s.color, size:9, bold:true, max:bw-4}));
+          lbl(s.sub, sx+bw/2, y+lines.length*13+6, {color:'#8b949e', size:8, max:bw-4});
+          if (i < stages.length-1) {
+            arw(sx+bw+2, y, sx+bw+22, y, {color:'#f0883e', active:true, lw:2.5});
+          }
+          sx += bw + 24;
+        });
+
+        // from_documents call box
+        const callY = y + bh/2 + 24;
+        box(CW/2-180, callY, 360, 50, {fill:'#1c2330', stroke:'#f0883e', r:6});
+        lbl('QdrantVectorStore.from_documents(', CW/2, callY+12, {color:'#f0883e', size:10, bold:true});
+        lbl('documents=splits, embedding=embeddings, location=":memory:",', CW/2, callY+26, {color:'#79c0ff', size:9});
+        lbl('collection_name="cat_health_guidelines", force_recreate=True)', CW/2, callY+40, {color:'#79c0ff', size:9});
+
+        // Memory note
+        box(20, CH-44, CW-40, 32, {fill:'#0c2d6b', stroke:'#58a6ff', r:6});
+        lbl('location=":memory:" → Qdrant runs inside Python process. Fast to start, no Docker needed. Resets when kernel stops.', CW/2, CH-26, {color:'#8b949e', size:9});
+      },
+      log: {t:'tool', m:'QdrantVectorStore.from_documents() → embedding N chunks via OpenAI API → storing in :memory:'},
+      desc: `<strong>Task 5 — Embed + Store.</strong> <code>QdrantVectorStore.from_documents()</code> does two things in one call: (1) sends all chunk text to the OpenAI embedding API and gets back a 1536-float vector per chunk, (2) stores those vectors in an in-memory Qdrant collection named "cat_health_guidelines". <strong>Think of Qdrant as a specialized database index</strong> — like an inverted index for text search, but instead of exact keyword matches, it finds nearest neighbors in vector space. <em>location=":memory:" means no external server needed — Qdrant runs inside the Python process itself.</em>`,
+      obj: { label:'QdrantVectorStore', fields:[
+        {k:'collection_name', v:'"cat_health_guidelines"', s:'set'},
+        {k:'location', v:'":memory:" (no external server)', s:'set'},
+        {k:'embedding_model', v:'text-embedding-3-small', s:'set'},
+        {k:'vector_dims', v:'1536 per chunk', s:'set'},
+        {k:'force_recreate', v:'True (fresh start)', s:'set'},
+        {k:'chunks_indexed', v:'N vectors stored', s:'dirty'},
+      ]}
+    },
+    {
+      render() {
+        clr(); grid();
+        lbl('T5: How Qdrant Finds Similar Vectors (ANN Search)', CW/2, 22, {color:'#f0883e', size:13, bold:true});
+
+        // Query enters
+        const qx = 30, qy = 100, qw = 90, qh = 50;
+        box(qx, qy, qw, qh, {fill:'#3d2200', stroke:'#f0883e', r:8});
+        lbl('Query', qx+qw/2, qy+14, {color:'#f0883e', size:10, bold:true});
+        lbl('"vet signs"', qx+qw/2, qy+30, {color:'#8b949e', size:9});
+
+        // Arrow → embed
+        arw(qx+qw+2, qy+qh/2, qx+qw+42, qy+qh/2, {color:'#f0883e', active:true, lw:2});
+        lbl('embed', qx+qw+22, qy+qh/2-12, {color:'#f0883e', size:8});
+
+        // Query vector
+        const vx = qx+qw+44, vy = qy-10, vw = 100, vh = 70;
+        box(vx, vy, vw, vh, {fill:'#1a0e3a', stroke:'#bc8cff', r:6});
+        lbl('query vector', vx+vw/2, vy+14, {color:'#bc8cff', size:9, bold:true});
+        lbl('[0.12, -0.87,', vx+vw/2, vy+30, {color:'#79c0ff', size:8});
+        lbl(' 0.33, ... ]', vx+vw/2, vy+43, {color:'#79c0ff', size:8});
+        lbl('1536 dims', vx+vw/2, vy+58, {color:'#30363d', size:8});
+
+        // Arrow → Qdrant
+        arw(vx+vw+2, vy+vh/2, vx+vw+36, vy+vh/2, {color:'#bc8cff', active:true, lw:2});
+        lbl('ANN search', vx+vw+20, vy+vh/2-12, {color:'#bc8cff', size:8});
+
+        // Qdrant box with stored vectors
+        const qdbX = vx+vw+38, qdbY = 50, qdbW = Math.min(160, CW-qdbX-30), qdbH = 150;
+        box(qdbX, qdbY, qdbW, qdbH, {fill:'#0c2d6b', stroke:'#58a6ff', glow:'#58a6ff', r:8});
+        lbl('🗄️ Qdrant', qdbX+qdbW/2, qdbY+16, {color:'#58a6ff', size:11, bold:true});
+        [[0.91,'Chunk[12]: annual rabies'],[0.87,'Chunk[8]: vet visits'],[0.75,'Chunk[45]: dental care'],[0.68,'Chunk[23]: vaccines']].forEach(([score,label],i) => {
+          const bar = qdbX+8, bary = qdbY+30+i*28, barW = (qdbW-16)*score, barH = 18;
+          box(bar, bary, qdbW-16, barH, {fill:'#0d1117', stroke:'#21262d', r:3});
+          box(bar, bary, barW, barH, {fill:'#0c2d6b', stroke:'none', r:3});
+          lbl(score.toFixed(2), bar+barW-4, bary+barH/2, {color:'#58a6ff', size:9, bold:true, align:'right'});
+          lbl(label, bar+4, bary+barH/2, {color:'#e6edf3', size:8, align:'left', max:barW-30});
+        });
+
+        // Arrow → top-k results
+        const resX = qdbX+qdbW+10, resY = 60, resW = Math.min(120, CW-resX-10), resH = 130;
+        if (resX + resW < CW) {
+          arw(qdbX+qdbW+2, qdbY+qdbH/2, resX, resY+resH/2, {color:'#3fb950', active:true, lw:2});
+          box(resX, resY, resW, resH, {fill:'#0e3a1a', stroke:'#3fb950', r:6});
+          lbl('Top-4 Results', resX+resW/2, resY+14, {color:'#3fb950', size:9, bold:true});
+          ['Score 0.91','Score 0.87','Score 0.75','Score 0.68'].forEach((s,i) => {
+            lbl(s, resX+resW/2, resY+30+i*22, {color:i<2?'#3fb950':'#8b949e', size:9});
+          });
+          lbl('k=4', resX+resW/2, resY+resH-12, {color:'#f0883e', size:8, bold:true});
+        }
+
+        box(20, CH-44, CW-40, 32, {fill:'#1c2330', stroke:'#30363d', r:6});
+        lbl('Qdrant uses Approximate Nearest Neighbor (ANN) search — finds top-k vectors fastest without checking all N vectors.', CW/2, CH-26, {color:'#8b949e', size:9});
+      },
+      log: {t:'ok', m:'vector_store ready — similarity_search_with_score() now available for retrieval'},
+      desc: `<strong>How vector search works.</strong> When a question comes in, we embed it with the same model (text-embedding-3-small → 1536 floats). Qdrant then does an <strong>Approximate Nearest Neighbor (ANN) search</strong> — it compares the query vector against all stored chunk vectors and returns the <code>k</code> most similar ones, ranked by cosine score. This is why embedding model consistency matters: query and chunks must use the same model, or the scores are meaningless. <em>Connection to Task 6: we're about to inspect those scores directly to understand retrieval quality.</em>`,
+      obj: { label:'Qdrant ANN Search', fields:[
+        {k:'query_vector', v:'1536-float query embedding', s:'set'},
+        {k:'search_type', v:'cosine similarity (ANN)', s:'set'},
+        {k:'k', v:'4 (returned chunks)', s:'set'},
+        {k:'result', v:'[(Document, score), ...]', s:'dirty'},
+      ]}
+    }
+  ]};
+}
+
+// ─────────────────── TASK 6: RETRIEVAL SCORES ───────────────────
+function buildTask6() {
+  return { name:'T6: Retrieval Scores', steps: [
+    {
+      render() {
+        clr(); grid();
+        lbl('T6: display_retrieval_results() — Inspect Before You Generate', CW/2, 22, {color:'#f0883e', size:13, bold:true});
+        lbl('← T5: Qdrant is loaded. Before generating answers, inspect what gets retrieved.', CW/2, 40, {color:'#8b949e', size:9});
+
+        // Function anatomy
+        const fx = 20, fy = 56, fw = Math.min(280, CW*0.4), fh = 100;
+        box(fx, fy, fw, fh, {fill:'#3d2200', stroke:'#f0883e', r:8});
+        lbl('display_retrieval_results(', fx+fw/2, fy+14, {color:'#f0883e', size:10, bold:true});
+        lbl('query: str, k: int)', fx+fw/2, fy+26, {color:'#f0883e', size:10, bold:true});
+        lbl('1. similarity_search_with_score(query, k)', fx+fw/2, fy+46, {color:'#79c0ff', size:9});
+        lbl('2. for each result:', fx+fw/2, fy+60, {color:'#79c0ff', size:9});
+        lbl('   print score, page, start_index', fx+fw/2, fy+72, {color:'#79c0ff', size:9});
+        lbl('   print first 350 chars of content', fx+fw/2, fy+84, {color:'#79c0ff', size:9});
+
+        // Sample output
+        const ox = fx+fw+16, oy = fy, ow = CW-ox-20, oh = 160;
+        box(ox, oy, ow, oh, {fill:'#0d1117', stroke:'#30363d', r:6});
+        lbl('Sample Output:', ox+ow/2, oy+14, {color:'#8b949e', size:9, bold:true});
+
+        const results = [
+          {score:0.87, page:3, label:'Source 1', text:'"Cats should see a veterinarian if...' ,color:'#3fb950'},
+          {score:0.82, page:7, label:'Source 2', text:'"Warning signs include lethargy, loss...',color:'#3fb950'},
+          {score:0.71, page:2, label:'Source 3', text:'"Annual wellness exams help detect...',color:'#58a6ff'},
+          {score:0.65, page:9, label:'Source 4', text:'"Dental disease is common in cats...',color:'#ffa657'},
+        ];
+
+        results.forEach((r, i) => {
+          const ry2 = oy+30+i*32;
+          box(ox+8, ry2, ow-16, 26, {fill:'#1c2330', stroke:r.color+'55', r:4});
+          lbl(`${r.label} | score=${r.score} | page=${r.page}`, ox+12, ry2+10, {color:r.color, size:9, bold:true, align:'left'});
+          lbl(r.text, ox+12, ry2+22, {color:'#8b949e', size:8, align:'left', max:ow-20});
+        });
+
+        // k value
+        box(fx, fy+fh+12, fw, 36, {fill:'#0c2d6b', stroke:'#58a6ff', r:6});
+        lbl('retrieval_k = 4', fx+fw/2, fy+fh+20, {color:'#58a6ff', size:10, bold:true});
+        lbl('→ return top 4 most similar chunks', fx+fw/2, fy+fh+32, {color:'#8b949e', size:9});
+      },
+      log: {t:'node', m:'display_retrieval_results("What signs suggest vet visit?", k=4) → showing top-4 chunks'},
+      desc: `<strong>Task 6 — Retrieval Inspection.</strong> <code>display_retrieval_results()</code> calls <code>similarity_search_with_score()</code> and prints results <em>before</em> passing them to the LLM. This is the most important debugging step in RAG. If the retrieved chunks are irrelevant, <strong>the answer will be wrong no matter how good the LLM is</strong>. Think of it like Googling something — you check the search results before clicking. The <code>k=4</code> parameter controls how many chunks to retrieve. Higher k = more context, but also more noise. <em>Next: we format this context and pass it to GPT.</em>`,
+      obj: { label:'display_retrieval_results()', fields:[
+        {k:'query', v:'"What signs suggest a vet visit?"', s:'set'},
+        {k:'k', v:'4 (chunks to retrieve)', s:'set'},
+        {k:'returns', v:'list of (Document, score) tuples', s:'set'},
+        {k:'source_1_score', v:'0.87 (strong match)', s:'dirty'},
+        {k:'source_4_score', v:'0.65 (acceptable)', s:'set'},
+      ]}
+    },
+    {
+      render() {
+        clr(); grid();
+        lbl('T6: Interpreting Similarity Scores', CW/2, 22, {color:'#f0883e', size:13, bold:true});
+
+        // Score scale
+        const sx = 30, sy = 56, sw = CW-60, sh = 32;
+        // Gradient bar
+        const grad = ctx.createLinearGradient(sx, sy, sx+sw, sy);
+        grad.addColorStop(0, '#2d1010');
+        grad.addColorStop(0.4, '#3d2200');
+        grad.addColorStop(0.7, '#0e3a1a');
+        grad.addColorStop(1, '#0c2d6b');
+        ctx.save();
+        rr(ctx, sx, sy, sw, sh, 4);
+        ctx.fillStyle = grad; ctx.fill();
+        ctx.strokeStyle = '#30363d'; ctx.lineWidth = 1; ctx.stroke();
+        ctx.restore();
+
+        // Labels on scale
+        [['0.0','Completely\nunrelated','#ff7b72'],['0.3','Weak match\n(probably noisy)','#ffa657'],['0.5','Moderate\nrelevance','#f0883e'],['0.7','Good match\n(use this!)','#3fb950'],['1.0','Near\nidentical','#58a6ff']].forEach(([score, label, color]) => {
+          const px = sx + parseFloat(score) * sw;
+          ctx.save();
+          ctx.strokeStyle = color; ctx.lineWidth = 2;
+          ctx.beginPath(); ctx.moveTo(px, sy); ctx.lineTo(px, sy+sh); ctx.stroke();
+          ctx.restore();
+          lbl(score, px, sy-8, {color, size:10, bold:true});
+          const lines = label.split('\n');
+          lines.forEach((line, i) => lbl(line, px, sy+sh+12+i*13, {color:'#8b949e', size:8}));
+        });
+
+        // Real examples
+        const ey = sy+sh+58;
+        box(sx, ey, sw, 80, {fill:'#1c2330', stroke:'#30363d', r:6});
+        lbl('Real examples from this notebook:', sx+sw/2, ey+12, {color:'#e6edf3', size:10, bold:true});
+        [['king ↔ queen','0.93','#3fb950','Semantically very close'],['cat ↔ veterinarian','0.73','#3fb950','Related domain'],['cat ↔ cat health guidelines','0.61','#ffa657','Fuzzy relevance'],['vet question ↔ taxes chunk','0.21','#ff7b72','Off-topic — noise']].forEach(([pair,score,color,note],i) => {
+          lbl(pair, sx+8, ey+30+i*14, {color:'#8b949e', size:9, align:'left'});
+          lbl(score, sx+sw*0.45, ey+30+i*14, {color, size:9, bold:true, align:'center'});
+          lbl(note, sx+sw*0.55, ey+30+i*14, {color:'#30363d', size:8, align:'left'});
+        });
+
+        // Key insight
+        box(sx, ey+90, sw, 36, {fill:'#0e3a1a', stroke:'#3fb950', r:6});
+        lbl('Key insight: Score says "how close?" not "is this the right answer?"', sx+sw/2, ey+102, {color:'#3fb950', size:10, bold:true});
+        lbl('A score of 0.85 means the text is semantically close — but you still need to read it to confirm correctness.', sx+sw/2, ey+116, {color:'#8b949e', size:9});
+      },
+      log: {t:'metric', m:'Score >0.70=strong match | 0.50-0.70=moderate | <0.50=weak | <0.30=noise'},
+      desc: `<strong>Interpreting similarity scores.</strong> A score of 0.93 (king/queen) means nearly identical meaning. 0.73 (cat/vet) means same domain. 0.61 (cat/cat health guidelines) means fuzzy relevance. Below 0.30 is likely noise — wrong topic entirely. <em>The student's observation was exactly right</em>: "it finds closest, not correct answers." The retriever returns the 4 best-matching chunks <strong>even if none perfectly answer the question</strong>. The LLM's job is to decide what to do with imperfect context — and if the context is too weak, it should say "I don't know." <strong>Next: pass retrieved context to GPT to generate a grounded answer.</strong>`,
+      obj: { label:'Similarity Scores', fields:[
+        {k:'>0.70', v:'Strong — high confidence retrieval', s:'set'},
+        {k:'0.50–0.70', v:'Moderate — check the content', s:'set'},
+        {k:'0.30–0.50', v:'Weak — probably off-topic', s:'set'},
+        {k:'<0.30', v:'Noise — unrelated text', s:'warn'},
+        {k:'activity_result', v:'500/100 chunks → scores dropped', s:'warn'},
+      ]}
+    }
+  ]};
+}
+
+// ─────────────────── TASK 7: RAG GENERATION ───────────────────
+function buildTask7() {
+  return { name:'T7: RAG Generation', steps: [
+    {
+      render() {
+        clr(); grid();
+        lbl('T7: RAG Pipeline — Putting It All Together', CW/2, 22, {color:'#f0883e', size:13, bold:true});
+        lbl('← T6: we inspected retrieval. Now we chain retrieval → prompt → LLM → answer.', CW/2, 40, {color:'#8b949e', size:9});
+
+        // Chain: prompt | llm | StrOutputParser
+        const y = 105;
+        const components = [
+          {label:'ChatPromptTemplate', sub:'system + human\ntemplate', color:'#bc8cff', fill:'#1a0e3a', stroke:'#bc8cff'},
+          {label:'ChatOpenAI', sub:'gpt-5.4-mini', color:'#f0883e', fill:'#3d2200', stroke:'#f0883e'},
+          {label:'StrOutputParser', sub:'extracts text\nfrom response', color:'#3fb950', fill:'#0e3a1a', stroke:'#3fb950'},
+        ];
+
+        const bw = Math.min(130, (CW-80)/3), bh = 68;
+        const totalW = components.length*bw + (components.length-1)*28;
+        let cx2 = (CW-totalW)/2;
+
+        components.forEach((c, i) => {
+          const lines = c.sub.split('\n');
+          box(cx2, y, bw, bh, {fill:c.fill, stroke:c.stroke, glow:c.stroke, r:8});
+          lbl(c.label, cx2+bw/2, y+16, {color:c.color, size:10, bold:true, max:bw-6});
+          lines.forEach((l2, li) => lbl(l2, cx2+bw/2, y+34+li*14, {color:'#8b949e', size:9, max:bw-6}));
+          if (i < components.length-1) {
+            arw(cx2+bw+2, y+bh/2, cx2+bw+26, y+bh/2, {color:'#f0883e', active:true, lw:2.5});
+            lbl('|', cx2+bw+14, y+bh/2-14, {color:'#f0883e', size:14, bold:true});
+          }
+          cx2 += bw + 28;
+        });
+
+        lbl('rag_chain = rag_prompt | llm | StrOutputParser()', CW/2, y+bh+16, {color:'#f0883e', size:10, bold:true});
+
+        // Data flow
+        const dfy = y+bh+36;
+        const inputs = [
+          {label:'context (string)', color:'#bc8cff', x:0.15},
+          {label:'question (string)', color:'#58a6ff', x:0.45},
+        ];
+        inputs.forEach(inp => {
+          arw(inp.x*CW, dfy, CW/2, dfy+26, {color:inp.color, lw:1.5, dash:[4,3]});
+          lbl(inp.label, inp.x*CW, dfy-8, {color:inp.color, size:9});
+        });
+
+        box(CW/2-120, dfy+28, 240, 28, {fill:'#3d2200', stroke:'#f0883e', r:6});
+        lbl('rag_chain.invoke({"context": ..., "question": ...})', CW/2, dfy+42, {color:'#f0883e', size:9});
+
+        arw(CW/2, dfy+58, CW/2, dfy+78, {color:'#3fb950', active:true, lw:2});
+
+        box(CW/2-140, dfy+80, 280, 36, {fill:'#0e3a1a', stroke:'#3fb950', glow:'#3fb950', r:6});
+        lbl('Answer string with citations [Source 1], [Source 2]', CW/2, dfy+98, {color:'#3fb950', size:10, bold:true});
+      },
+      log: {t:'node', m:'rag_chain = ChatPromptTemplate | ChatOpenAI(gpt-5.4-mini) | StrOutputParser()'},
+      desc: `<strong>Task 7 — RAG Generation.</strong> We use LangChain's pipe operator <code>|</code> to chain three components: (1) <code>ChatPromptTemplate</code> fills in the system prompt and user question with the retrieved context, (2) <code>ChatOpenAI</code> sends it to gpt-5.4-mini, (3) <code>StrOutputParser</code> extracts just the text string from the API response. The chain is lazy — nothing runs until you call <code>.invoke()</code>. <em>This is the "G" in RAG: the same retrieval we built in Tasks 3–6 now feeds directly into generation.</em>`,
+      obj: { label:'rag_chain', fields:[
+        {k:'model', v:'gpt-5.4-mini', s:'set'},
+        {k:'prompt', v:'ChatPromptTemplate (system + human)', s:'set'},
+        {k:'parser', v:'StrOutputParser → plain string', s:'set'},
+        {k:'inputs', v:'context (str), question (str)', s:'set'},
+        {k:'output', v:'answer string with [Source N] cites', s:'dirty'},
+      ]}
+    },
+    {
+      render() {
+        clr(); grid();
+        lbl('T7: format_context() — Building the Prompt Context', CW/2, 22, {color:'#f0883e', size:13, bold:true});
+
+        // Input: scored_docs list
+        const ix = 20, iy = 50, iw = Math.min(150, CW*0.22), ih = 130;
+        box(ix, iy, iw, ih, {fill:'#0c2d6b', stroke:'#58a6ff', r:6});
+        lbl('scored_docs', ix+iw/2, iy+14, {color:'#58a6ff', size:10, bold:true});
+        lbl('[(doc1, 0.87),', ix+iw/2, iy+34, {color:'#79c0ff', size:9});
+        lbl(' (doc2, 0.82),', ix+iw/2, iy+48, {color:'#79c0ff', size:9});
+        lbl(' (doc3, 0.71),', ix+iw/2, iy+62, {color:'#79c0ff', size:9});
+        lbl(' (doc4, 0.65)]', ix+iw/2, iy+76, {color:'#79c0ff', size:9});
+        lbl('from Qdrant.', ix+iw/2, iy+96, {color:'#30363d', size:8});
+        lbl('similarity_search', ix+iw/2, iy+108, {color:'#30363d', size:8});
+
+        // Arrow → format_context
+        arw(ix+iw+4, iy+ih/2, ix+iw+34, iy+ih/2, {color:'#f0883e', active:true, lw:2});
+
+        // format_context box
+        const fx = ix+iw+36, fy = iy, fw = Math.min(160, CW*0.24), fh = 130;
+        box(fx, fy, fw, fh, {fill:'#3d2200', stroke:'#f0883e', glow:'#f0883e33', r:8});
+        lbl('format_context(', fx+fw/2, fy+14, {color:'#f0883e', size:10, bold:true});
+        lbl('scored_docs)', fx+fw/2, fy+26, {color:'#f0883e', size:10, bold:true});
+        lbl('for each (doc, score):', fx+fw/2, fy+46, {color:'#8b949e', size:9});
+        lbl('[Source N] filename', fx+fw/2, fy+60, {color:'#79c0ff', size:9});
+        lbl('page N, score X.XX', fx+fw/2, fy+72, {color:'#79c0ff', size:9});
+        lbl('+ doc.page_content', fx+fw/2, fy+86, {color:'#79c0ff', size:9});
+        lbl('→ joined with \\n\\n', fx+fw/2, fy+106, {color:'#8b949e', size:8});
+
+        // Arrow → context string
+        arw(fx+fw+4, fy+fh/2, fx+fw+26, fy+fh/2, {color:'#bc8cff', active:true, lw:2});
+
+        // Context string box
+        const ctx2X = fx+fw+28, ctx2Y = iy, ctx2W = CW-ctx2X-20, ctx2H = 130;
+        box(ctx2X, ctx2Y, ctx2W, ctx2H, {fill:'#1a0e3a', stroke:'#bc8cff', r:6});
+        lbl('context string', ctx2X+ctx2W/2, ctx2Y+12, {color:'#bc8cff', size:10, bold:true});
+        lbl('[Source 1] cat_health.pdf', ctx2X+ctx2W/2, ctx2Y+30, {color:'#79c0ff', size:8});
+        lbl('page 3, score 0.870', ctx2X+ctx2W/2, ctx2Y+42, {color:'#8b949e', size:8});
+        lbl('"Cats should see a vet..."', ctx2X+ctx2W/2, ctx2Y+58, {color:'#e6edf3', size:8});
+        lbl('[Source 2] cat_health.pdf', ctx2X+ctx2W/2, ctx2Y+78, {color:'#79c0ff', size:8});
+        lbl('page 7, score 0.820', ctx2X+ctx2W/2, ctx2Y+90, {color:'#8b949e', size:8});
+        lbl('"Warning signs include..."', ctx2X+ctx2W/2, ctx2Y+106, {color:'#e6edf3', size:8});
+        lbl('... (Sources 3, 4 follow)', ctx2X+ctx2W/2, ctx2Y+120, {color:'#30363d', size:8});
+
+        // Goes into prompt
+        const py = iy+ih+20;
+        arw(CW/2, iy+ih+4, CW/2, py+16, {color:'#3fb950', active:true, lw:2});
+        box(CW/2-160, py+18, 320, 36, {fill:'#0e3a1a', stroke:'#3fb950', r:6});
+        lbl('→ inserted into RAG_USER_PROMPT as {context}', CW/2, py+30, {color:'#3fb950', size:10, bold:true});
+        lbl('LLM sees: system prompt + context + question → generates cited answer', CW/2, py+44, {color:'#8b949e', size:9});
+      },
+      log: {t:'data', m:'format_context(scored_docs[:2]) → "[Source 1] cat_health_guidelines.pdf, page 3, score 0.870..."'},
+      desc: `<strong>format_context()</strong> transforms the raw <code>(Document, score)</code> tuples from Qdrant into a human-readable string with <em>labeled source references</em>. Each chunk gets a [Source N] label, its filename, page number, and score. This entire string is then inserted into the RAG prompt as <code>{context}</code>. The LLM is instructed to cite these labels inline. <strong>This is why the citations in the final answer say "[Source 1]"</strong> — the format_context function created those labels before the LLM ever saw the text.`,
+      obj: { label:'format_context()', fields:[
+        {k:'input', v:'list of (Document, score) tuples', s:'set'},
+        {k:'output', v:'formatted multi-source context str', s:'dirty'},
+        {k:'source_label', v:'[Source 1], [Source 2]...', s:'set'},
+        {k:'includes', v:'filename + page + score + text', s:'set'},
+      ]}
+    },
+    {
+      render() {
+        clr(); grid();
+        lbl('T7: answer_question() — Full Retrieve-Then-Generate', CW/2, 22, {color:'#f0883e', size:13, bold:true});
+
+        // Swimlane diagram
+        const lanes = [
+          {name:'User', color:'#8b949e', y:62},
+          {name:'answer_question()', color:'#f0883e', y:118},
+          {name:'Qdrant', color:'#58a6ff', y:174},
+          {name:'format_context()', color:'#bc8cff', y:230},
+          {name:'rag_chain', color:'#3fb950', y:286},
+        ];
+
+        // Lane headers
+        lanes.forEach(l => {
+          box(6, l.y-14, 110, 22, {fill:'#1c2330', stroke:l.color+'55', r:4});
+          lbl(l.name, 62, l.y-3, {color:l.color, size:9, bold:true});
+          // Dashed lane line
+          ctx.save(); ctx.strokeStyle=l.color+'22'; ctx.lineWidth=1; ctx.setLineDash([4,4]);
+          ctx.beginPath(); ctx.moveTo(120, l.y-3); ctx.lineTo(CW-10, l.y-3); ctx.stroke();
+          ctx.restore();
+        });
+
+        // Step arrows across lanes
+        const steps = [
+          {from:0, to:1, x:200, label:'question + k', color:'#8b949e'},
+          {from:1, to:2, x:310, label:'similarity_search(q, k=4)', color:'#f0883e'},
+          {from:2, to:1, x:420, label:'scored_docs', color:'#58a6ff'},
+          {from:1, to:3, x:500, label:'scored_docs', color:'#f0883e'},
+          {from:3, to:1, x:580, label:'context_str', color:'#bc8cff'},
+          {from:1, to:4, x:660, label:'invoke(context, q)', color:'#f0883e'},
+          {from:4, to:1, x:750, label:'answer', color:'#3fb950'},
+        ];
+
+        // Only render steps that fit
+        steps.forEach(s => {
+          if (s.x > CW - 20) return;
+          const y1 = lanes[s.from].y - 3, y2 = lanes[s.to].y - 3;
+          const dir = y2 > y1 ? 1 : -1;
+          arw(s.x, y1+dir*4, s.x, y2-dir*4, {color:s.color, active:true, lw:1.5});
+          lbl(s.label, s.x+4, (y1+y2)/2, {color:s.color, size:8, align:'left', max:80});
+        });
+      },
+      log: {t:'tool', m:'answer_question("What are signs my cat needs vet attention?", k=4) → retrieved → formatted → generated'},
+      desc: `<strong>answer_question()</strong> is the full RAG pipeline in one function: (1) call <code>similarity_search_with_score()</code> on Qdrant to get top-k chunks, (2) call <code>format_context()</code> to build the labeled context string, (3) call <code>rag_chain.invoke()</code> with that context and the question, (4) return a dict with the answer, sources list, and the raw scored_docs. The swimlane shows each handoff between components. <em>Notice: the answer comes back with [Source 1] citations because format_context() labeled each chunk before the LLM saw it.</em>`,
+      obj: { label:'answer_question()', fields:[
+        {k:'step_1', v:'similarity_search_with_score(q, k)', s:'set'},
+        {k:'step_2', v:'format_context(scored_docs)', s:'set'},
+        {k:'step_3', v:'rag_chain.invoke({context, question})', s:'set'},
+        {k:'returns.answer', v:'str with [Source N] citations', s:'dirty'},
+        {k:'returns.sources', v:'list of {file, page, score}', s:'set'},
+      ]}
+    },
+    {
+      render() {
+        clr(); grid();
+        lbl('T7: Vibe Check — Testing with 4 Questions', CW/2, 22, {color:'#f0883e', size:13, bold:true});
+
+        const questions = [
+          {q:'What preventive care is recommended for cats?', status:'✅ Answered', score:'~0.82', color:'#3fb950', result:'Annual exams, vaccines, dental, parasite control [Source 1]'},
+          {q:'What symptoms should make me call a vet?', status:'✅ Answered', score:'~0.87', color:'#3fb950', result:'Lethargy, vomiting, weight loss, hiding... [Source 2]'},
+          {q:'What should I know about feeding a healthy adult cat?', status:'✅ Answered', score:'~0.75', color:'#ffa657', result:'Portion control, wet + dry mix, fresh water [Source 3]'},
+          {q:'Can my cat help me file my taxes? 🧾', status:'❌ Out of scope', score:'~0.21', color:'#ff7b72', result:'"I don\'t have enough information in the cat health PDF..."'},
+        ];
+
+        questions.forEach((q, i) => {
+          const qy = 54 + i * 60, qw = CW - 40;
+          box(20, qy, qw, 52, {fill:i===3?'#2d1010':'#1c2330', stroke:q.color+'55', r:6});
+          lbl(q.q, 28, qy+14, {color:q.color, size:9, bold:true, align:'left', max:qw*0.55});
+          lbl(q.status, CW-50, qy+14, {color:q.color, size:9, bold:true, align:'right'});
+          lbl('Score: '+q.score, CW-150, qy+30, {color:'#8b949e', size:8, align:'right'});
+          lbl('→ '+q.result, 28, qy+38, {color:'#8b949e', size:8, align:'left', max:qw-16});
+        });
+
+        // Key lesson
+        box(20, CH-48, CW-40, 38, {fill:'#0e3a1a', stroke:'#3fb950', r:6});
+        lbl('🎯 The tax question is the most important test: a good RAG system should REFUSE to answer off-topic questions.', CW/2, CH-34, {color:'#3fb950', size:10, bold:true});
+        lbl('The system prompt says: "If context doesn\'t contain enough info, say so." The model correctly declines.', CW/2, CH-20, {color:'#8b949e', size:9});
+      },
+      log: {t:'ok', m:'vibe_check: 3/4 answered correctly from PDF | 1/4 correctly refused (off-topic: taxes)'},
+      desc: `<strong>Vibe Check.</strong> Four test questions validate the system: three that should be answerable from the cat health PDF, and one deliberately off-topic (taxes). The first three return relevant context with scores above 0.70 and produce grounded answers with citations. The tax question returns chunks with scores around 0.21 (noise) — and the LLM correctly refuses to answer, citing the system prompt instruction. <em>This confirms that the RAG guard rail works</em>: when retrieval fails, the model says "I don't know" instead of hallucinating. This is the most important safety behavior in a RAG system.`,
+      obj: { label:'Vibe Check Results', fields:[
+        {k:'preventive_care', v:'✅ Answered (score ~0.82)', s:'set'},
+        {k:'vet_symptoms', v:'✅ Answered (score ~0.87)', s:'set'},
+        {k:'feeding', v:'✅ Answered (score ~0.75)', s:'set'},
+        {k:'taxes', v:'❌ Refused (score ~0.21 = noise)', s:'warn'},
+        {k:'guard_rail', v:'system prompt → "I don\'t know"', s:'set'},
+      ]}
+    }
+  ]};
+}
+
+// ─────────────────── TASK 8: ACTIVITY ───────────────────
+function buildTask8() {
+  return { name:'🔬 Activity: Tune', steps: [
+    {
+      render() {
+        clr(); grid();
+        lbl('Activity: Tune Retrieval — Experiment Workflow', CW/2, 22, {color:'#f0883e', size:13, bold:true});
+        lbl('← T7 complete. Now you change one variable and see if retrieval improves.', CW/2, 40, {color:'#8b949e', size:9});
+
+        // Tuning workflow
+        const steps2 = [
+          {n:'1', label:'Pick a\ntest question', color:'#58a6ff', fill:'#0c2d6b', icon:'❓'},
+          {n:'2', label:'Inspect chunks\n+ scores', color:'#bc8cff', fill:'#1a0e3a', icon:'🔍'},
+          {n:'3', label:'Change ONE\nvariable', color:'#f0883e', fill:'#3d2200', icon:'⚙️'},
+          {n:'4', label:'Rebuild\nvector store', color:'#ffa657', fill:'#3d2700', icon:'🔨'},
+          {n:'5', label:'Compare\nresults', color:'#3fb950', fill:'#0e3a1a', icon:'📊'},
+        ];
+
+        const bw = Math.min(95, (CW-40)/5-10), bh = 80;
+        const total = steps2.length*bw + (steps2.length-1)*14;
+        let sx = (CW-total)/2;
+
+        steps2.forEach((s, i) => {
+          const lines = s.label.split('\n');
+          box(sx, 65, bw, bh, {fill:s.fill, stroke:s.color, glow:s.color, r:8});
+          lbl(s.icon, sx+bw/2, 85, {size:20});
+          lines.forEach((line, li) => lbl(line, sx+bw/2, 108+li*13, {color:s.color, size:9, bold:true, max:bw-4}));
+          if (i < steps2.length-1) arw(sx+bw+2, 65+bh/2, sx+bw+12, 65+bh/2, {color:'#30363d', lw:1.5});
+          sx += bw + 14;
+        });
+
+        // Variables you can tune
+        const vy = 165;
+        box(20, vy, CW-40, 90, {fill:'#1c2330', stroke:'#30363d', r:8});
+        lbl('Variables you can tune:', CW/2, vy+14, {color:'#e6edf3', size:10, bold:true});
+        const vars = [
+          ['chunk_size', '500, 1000, 2000...', 'Affects vector specificity'],
+          ['chunk_overlap', '100, 200, 400...', 'Affects boundary context'],
+          ['k', '2, 4, 8...', 'More chunks = more context (also more noise)'],
+          ['query wording', '"vet signs" vs "when to call veterinarian"', 'Semantic search is query-sensitive'],
+        ];
+        vars.forEach(([v, ex, note], i) => {
+          const col = i < 2 ? 0 : 1, row = i % 2;
+          const vx = col === 0 ? CW/4 : CW*3/4, vvy = vy+34+row*26;
+          lbl(`${v}: ${ex}`, vx, vvy, {color:'#79c0ff', size:9, bold:col===0});
+          lbl(note, vx, vvy+12, {color:'#8b949e', size:8});
+        });
+
+        // Key principle
+        box(20, CH-44, CW-40, 32, {fill:'#3d2200', stroke:'#f0883e', r:6});
+        lbl('⚠️ Change ONE variable at a time — if you change 3 things at once, you can\'t tell what helped.', CW/2, CH-28, {color:'#f0883e', size:10, bold:true});
+      },
+      log: {t:'info', m:'Activity: tune chunk_size/chunk_overlap/k — pick ONE question, change ONE variable, compare scores'},
+      desc: `<strong>Activity: Tune Retrieval Quality.</strong> This is a controlled experiment — change one variable and compare results before and after. The four variables you can tune are <code>chunk_size</code>, <code>chunk_overlap</code>, <code>k</code> (retrieval count), and the wording of the query itself. The workflow: pick a test question, inspect retrieval scores, change exactly one variable, rebuild the vector store (required!), then compare. <em>If you change multiple things at once, you can't isolate what caused the change — scientific method applies here too.</em>`,
+      obj: { label:'Tuning Variables', fields:[
+        {k:'chunk_size', v:'Try: 500, 1000, 2000', s:'set'},
+        {k:'chunk_overlap', v:'Try: 100, 200, 400', s:'set'},
+        {k:'k', v:'Try: 2, 4, 6, 8', s:'set'},
+        {k:'query_wording', v:'rephrase the question', s:'set'},
+        {k:'must_rebuild', v:'vector_store after ANY change!', s:'warn'},
+      ]}
+    },
+    {
+      render() {
+        clr(); grid();
+        lbl('Activity Results: Baseline (1000/200/k=4) vs Smaller (500/100/k=6)', CW/2, 22, {color:'#f0883e', size:13, bold:true});
+
+        // Two columns comparison
+        const col1X = CW*0.05, col2X = CW*0.52, colW = CW*0.44, colH = 200, colY = 50;
+
+        // Baseline
+        box(col1X, colY, colW, colH, {fill:'#0c2d6b', stroke:'#58a6ff', r:8});
+        lbl('✅ Baseline', col1X+colW/2, colY+16, {color:'#58a6ff', size:11, bold:true});
+        lbl('chunk_size=1000', col1X+colW/2, colY+34, {color:'#79c0ff', size:10});
+        lbl('chunk_overlap=200', col1X+colW/2, colY+48, {color:'#79c0ff', size:10});
+        lbl('k=4 chunks', col1X+colW/2, colY+62, {color:'#79c0ff', size:10});
+        ctx.save(); ctx.strokeStyle='#30363d'; ctx.lineWidth=1; ctx.setLineDash([4,3]);
+        ctx.beginPath(); ctx.moveTo(col1X+8, colY+74); ctx.lineTo(col1X+colW-8, colY+74); ctx.stroke();
+        ctx.restore();
+        lbl('Score on vet question:', col1X+colW/2, colY+90, {color:'#8b949e', size:9});
+        lbl('0.87 (Top chunk)', col1X+colW/2, colY+106, {color:'#3fb950', size:12, bold:true});
+        lbl('"Grounded, specific answer"', col1X+colW/2, colY+124, {color:'#3fb950', size:9});
+        lbl('"Mentioned lethargy, vomiting,', col1X+colW/2, colY+140, {color:'#8b949e', size:9});
+        lbl('weight loss with page citations"', col1X+colW/2, colY+154, {color:'#8b949e', size:9});
+        lbl('✓ Winner', col1X+colW/2, colY+176, {color:'#3fb950', size:11, bold:true});
+
+        // Experiment
+        box(col2X, colY, colW, colH, {fill:'#2d1010', stroke:'#ff7b72', r:8});
+        lbl('⚠️ Smaller Chunks', col2X+colW/2, colY+16, {color:'#ff7b72', size:11, bold:true});
+        lbl('chunk_size=500', col2X+colW/2, colY+34, {color:'#79c0ff', size:10});
+        lbl('chunk_overlap=100', col2X+colW/2, colY+48, {color:'#79c0ff', size:10});
+        lbl('k=6 chunks', col2X+colW/2, colY+62, {color:'#79c0ff', size:10});
+        ctx.save(); ctx.strokeStyle='#30363d'; ctx.lineWidth=1; ctx.setLineDash([4,3]);
+        ctx.beginPath(); ctx.moveTo(col2X+8, colY+74); ctx.lineTo(col2X+colW-8, colY+74); ctx.stroke();
+        ctx.restore();
+        lbl('Score on vet question:', col2X+colW/2, colY+90, {color:'#8b949e', size:9});
+        lbl('~0.71 (Scores dropped)', col2X+colW/2, colY+106, {color:'#ff7b72', size:12, bold:true});
+        lbl('"Fragmented answer"', col2X+colW/2, colY+124, {color:'#ff7b72', size:9});
+        lbl('"Chunks too small — lost the', col2X+colW/2, colY+140, {color:'#8b949e', size:9});
+        lbl('connective context between ideas"', col2X+colW/2, colY+154, {color:'#8b949e', size:9});
+        lbl('✗ Regression', col2X+colW/2, colY+176, {color:'#ff7b72', size:11, bold:true});
+
+        // Learning
+        box(20, colY+colH+14, CW-40, 48, {fill:'#0e3a1a', stroke:'#3fb950', r:6});
+        lbl('💡 Key lesson: Smaller chunks ≠ better retrieval.', CW/2, colY+colH+28, {color:'#3fb950', size:11, bold:true});
+        lbl('500 chars is too small for medical text — each chunk loses the surrounding context.', CW/2, colY+colH+43, {color:'#8b949e', size:9});
+        lbl('1000/200 captures full medical guidelines with enough context per vector.', CW/2, colY+colH+57, {color:'#8b949e', size:9});
+      },
+      log: {t:'metric', m:'Experiment: 500/100 → scores dropped, answer fragmented. Baseline 1000/200 wins.'},
+      desc: `<strong>Activity Results.</strong> The student tried cutting <code>chunk_size</code> from 1000→500 and <code>chunk_overlap</code> from 200→100, while increasing <code>k</code> from 4→6 to compensate. Result: <em>retrieval scores dropped and the answer got worse.</em> Why? At 500 chars, medical text gets cut mid-thought — each chunk no longer has a complete idea. The vectors become blurry fragments. The 200-char overlap at 1000-char chunks was doing more work than it appeared — cutting it to 100 chars removed the crucial boundary glue. <strong>The baseline 1000/200/k=4 was already well-tuned for this dataset.</strong>`,
+      obj: { label:'Experiment Comparison', fields:[
+        {k:'baseline_score', v:'~0.87 (strong retrieval)', s:'set'},
+        {k:'experiment_score', v:'~0.71 (scores dropped)', s:'warn'},
+        {k:'baseline_answer', v:'Grounded, specific, cited', s:'set'},
+        {k:'experiment_answer', v:'Fragmented (lost context)', s:'warn'},
+        {k:'conclusion', v:'1000/200 is the right setting here', s:'set'},
+      ]}
+    },
+    {
+      render() {
+        clr(); grid();
+        lbl('🏆 System Summary — Everything We Built', CW/2, 20, {color:'#f0883e', size:13, bold:true});
+
+        // Full pipeline summary
+        const nodes = [
+          {x:0.08, y:0.38, label:'cat_health\n.pdf', color:'#8b949e', fill:'#1c2330', stroke:'#30363d', w:70, h:52},
+          {x:0.22, y:0.38, label:'Document\nobjects', color:'#58a6ff', fill:'#0c2d6b', stroke:'#58a6ff', w:80, h:52},
+          {x:0.38, y:0.38, label:'1000-char\nchunks', color:'#bc8cff', fill:'#1a0e3a', stroke:'#bc8cff', w:78, h:52},
+          {x:0.54, y:0.38, label:'Qdrant\nvectors', color:'#3fb950', fill:'#0e3a1a', stroke:'#3fb950', w:78, h:52},
+          {x:0.70, y:0.20, label:'User\nQuestion', color:'#ffa657', fill:'#3d2700', stroke:'#ffa657', w:72, h:46},
+          {x:0.70, y:0.62, label:'Top-4\nChunks', color:'#58a6ff', fill:'#0c2d6b', stroke:'#58a6ff', w:72, h:46},
+          {x:0.87, y:0.38, label:'🤖 GPT\nAnswer', color:'#3fb950', fill:'#0e3a1a', stroke:'#3fb950', w:74, h:52},
+        ];
+
+        const bW = Math.min(900, CW);
+        const bH = CH - 40;
+        const ox = (CW - bW) / 2, oy = 36;
+
+        nodes.forEach((n, i) => {
+          const nx = ox + n.x * bW - n.w/2, ny = oy + n.y * bH - n.h/2;
+          const lines = n.label.split('\n');
+          box(nx, ny, n.w, n.h, {fill:n.fill, stroke:n.stroke, r:8});
+          lines.forEach((line, li) => lbl(line, nx+n.w/2, ny+n.h/2-6+li*14, {color:n.color, size:9, bold:true, max:n.w-4}));
+
+          // Arrows
+          if (i === 0) arw(ox+nodes[0].x*bW-nodes[0].w/2+nodes[0].w, oy+nodes[0].y*bH, ox+nodes[1].x*bW-nodes[1].w/2, oy+nodes[1].y*bH, {color:'#30363d',lw:1.5});
+          if (i === 1) arw(ox+nodes[1].x*bW-nodes[1].w/2+nodes[1].w, oy+nodes[1].y*bH, ox+nodes[2].x*bW-nodes[2].w/2, oy+nodes[2].y*bH, {color:'#30363d',lw:1.5});
+          if (i === 2) arw(ox+nodes[2].x*bW-nodes[2].w/2+nodes[2].w, oy+nodes[2].y*bH, ox+nodes[3].x*bW-nodes[3].w/2, oy+nodes[3].y*bH, {color:'#30363d',lw:1.5});
+          // User question → Qdrant
+          if (i === 4) {
+            const n4 = nodes[4], n3 = nodes[3], n5 = nodes[5], n6 = nodes[6];
+            arw(ox+n4.x*bW, oy+n4.y*bH+n4.h/2, ox+n3.x*bW, oy+n3.y*bH, {color:'#ffa657',active:true,lw:1.5,dash:[4,3]});
+            lbl('embed+search', ox+(n4.x+n3.x)/2*bW+10, oy+(n4.y+n3.y)/2*bH-8, {color:'#ffa657',size:8});
+            arw(ox+n3.x*bW+n3.w/2, oy+n3.y*bH+n3.h/2, ox+n5.x*bW, oy+n5.y*bH, {color:'#58a6ff',active:true,lw:2});
+            lbl('top-k', ox+(n3.x+n5.x)/2*bW+10, oy+(n3.y+n5.y)/2*bH+10, {color:'#58a6ff',size:8});
+            arw(ox+n4.x*bW+n4.w/2+4, oy+n4.y*bH, ox+n6.x*bW-4, oy+n6.y*bH, {color:'#ffa657',lw:1.5,dash:[3,3]});
+            arw(ox+n5.x*bW+n5.w/2, oy+n5.y*bH, ox+n6.x*bW-4, oy+n6.y*bH, {color:'#3fb950',active:true,lw:2});
+            lbl('context', ox+(n5.x+n6.x)/2*bW+4, oy+(n5.y+n6.y)/2*bH+4, {color:'#3fb950',size:8});
+          }
+        });
+
+        // Labels
+        lbl('T3', ox+nodes[0].x*bW, oy+nodes[0].y*bH+nodes[0].h/2+12, {color:'#30363d',size:8});
+        lbl('T4', ox+nodes[1].x*bW, oy+nodes[1].y*bH+nodes[1].h/2+12, {color:'#30363d',size:8});
+        lbl('T5', ox+nodes[2].x*bW, oy+nodes[2].y*bH+nodes[2].h/2+12, {color:'#30363d',size:8});
+        lbl('T5', ox+nodes[3].x*bW, oy+nodes[3].y*bH+nodes[3].h/2+12, {color:'#30363d',size:8});
+        lbl('T2/T6', ox+nodes[4].x*bW, oy+nodes[4].y*bH-nodes[4].h/2-10, {color:'#30363d',size:8});
+        lbl('T6/T7', ox+nodes[5].x*bW, oy+nodes[5].y*bH+nodes[5].h/2+12, {color:'#30363d',size:8});
+        lbl('T7', ox+nodes[6].x*bW, oy+nodes[6].y*bH+nodes[6].h/2+12, {color:'#30363d',size:8});
+      },
+      log: {t:'ok', m:'🏆 Complete! Load→Chunk→Embed→Store→Retrieve→Generate — all tasks done!'},
+      desc: `<strong>Complete RAG System.</strong> You've now built every piece: (T3) PyPDFLoader turns the PDF into Document objects → (T4) RecursiveCharacterTextSplitter cuts them into 1000-char chunks with 200-char overlap → (T5) OpenAIEmbeddings vectorizes every chunk, QdrantVectorStore stores the vectors → (T6/T7) a user question is embedded and the top-4 most similar chunks are retrieved → the context is formatted with source labels and handed to gpt-5.4-mini which generates a cited answer. <strong>The activity confirmed: the 1000/200/k=4 defaults were well-chosen for this medical text dataset.</strong> Congratulations — you've built your first RAG pipeline! 🎉`,
+      obj: { label:'System Complete ✅', fields:[
+        {k:'load', v:'PyPDFLoader → Document objects', s:'set'},
+        {k:'chunk', v:'1000 chars, 200 overlap', s:'set'},
+        {k:'embed', v:'text-embedding-3-small (1536D)', s:'set'},
+        {k:'store', v:'Qdrant :memory: collection', s:'set'},
+        {k:'retrieve', v:'similarity_search k=4', s:'set'},
+        {k:'generate', v:'gpt-5.4-mini with citations', s:'set'},
+      ]}
+    }
+  ]};
+}
+
+// Init
+buildAllTasks();
+setupCanvas();
+clr(); grid();
+</script>
+</body>
+</html>
