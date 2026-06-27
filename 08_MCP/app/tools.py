@@ -1,8 +1,32 @@
+import functools
+import logging
 import secrets
+import time
 
 from mcp.server.auth.middleware.auth_context import get_access_token
 
 from .server import mcp, oauth_provider
+
+logger = logging.getLogger(__name__)
+
+
+def log_tool(func):
+    """Decorator that logs every tool call: entry, exit, timing, and full exception tracebacks."""
+    @functools.wraps(func)
+    async def wrapper(*args, **kwargs):
+        name = func.__name__
+        logger.info("→ %s  kwargs=%s", name, kwargs)
+        t0 = time.perf_counter()
+        try:
+            result = await func(*args, **kwargs)
+            ms = (time.perf_counter() - t0) * 1000
+            logger.info("✓ %s  %.1fms", name, ms)
+            return result
+        except Exception:
+            ms = (time.perf_counter() - t0) * 1000
+            logger.exception("✗ %s  %.1fms — unhandled exception", name, ms)
+            raise
+    return wrapper
 
 
 async def _get_username() -> str:
@@ -16,6 +40,7 @@ async def _get_username() -> str:
 
 
 @mcp.tool()
+@log_tool
 async def list_products(category: str | None = None) -> list[dict]:
     """Browse the cat shop catalog. Optionally filter by category (toys, beds, food, furniture)."""
     db = await oauth_provider._get_db()
@@ -36,6 +61,7 @@ async def list_products(category: str | None = None) -> list[dict]:
 
 
 @mcp.tool()
+@log_tool
 async def get_product(product_id: int) -> dict:
     """Get full details of a single product by its ID."""
     db = await oauth_provider._get_db()
@@ -56,6 +82,7 @@ async def get_product(product_id: int) -> dict:
 
 
 @mcp.tool()
+@log_tool
 async def add_to_cart(product_id: int, quantity: int = 1) -> dict:
     """Add a product to your shopping cart. If already in cart, quantity is increased."""
     username = await _get_username()
@@ -78,6 +105,7 @@ async def add_to_cart(product_id: int, quantity: int = 1) -> dict:
 
 
 @mcp.tool()
+@log_tool
 async def view_cart() -> dict:
     """View everything in your shopping cart with quantities and totals."""
     username = await _get_username()
@@ -104,6 +132,7 @@ async def view_cart() -> dict:
 
 
 @mcp.tool()
+@log_tool
 async def remove_from_cart(product_id: int) -> dict:
     """Remove a product from your shopping cart."""
     username = await _get_username()
@@ -119,6 +148,7 @@ async def remove_from_cart(product_id: int) -> dict:
 
 
 @mcp.tool()
+@log_tool
 async def checkout() -> dict:
     """Complete your purchase. Shows order summary and clears the cart."""
     username = await _get_username()
@@ -132,6 +162,8 @@ async def checkout() -> dict:
     await db.commit()
 
     order_id = secrets.token_hex(8).upper()
+    for item in cart["items"]:
+        await _save_order(username, item["product_id"], item["quantity"])
     return {
         "order_id": order_id,
         "status": "confirmed",
@@ -139,3 +171,41 @@ async def checkout() -> dict:
         "total": cart["total"],
         "message": f"Order {order_id} confirmed! Thanks {username}, your cats will love their new goodies!",
     }
+
+@mcp.tool()
+@log_tool
+async def update_cart_quantity(product_id: int, quantity: int) -> dict:
+    """Update the quantity of a product in your shopping cart."""
+    username = await _get_username()
+    db = await oauth_provider._get_db()
+    cursor = await db.execute(
+        "UPDATE cart_items SET quantity = ? WHERE username = ? AND product_id = ?",
+        (quantity, username, product_id),
+    )
+    await db.commit()
+    return {"success": True, "message": f"Updated quantity of {product_id} to {quantity}"}
+
+
+async def _save_order(username: str, product_id: int, quantity: int) -> dict:
+    db = await oauth_provider._get_db()
+    await db.execute(
+        "INSERT INTO orders (username, product_id, quantity, order_date) VALUES (?, ?, ?, ?)",
+        (username, product_id, quantity, time.time()),
+    )
+    await db.commit()
+    return {"success": True, "message": f"Order saved for {username}"}
+
+    
+
+@mcp.tool()
+@log_tool
+async def get_order_history() -> dict:
+    """Get the order history for the current user."""
+    username = await _get_username()
+    db = await oauth_provider._get_db()
+    cursor = await db.execute(
+        "SELECT * FROM orders WHERE username = ?",
+        (username,),
+    )
+    rows = await cursor.fetchall()
+    return {"orders": rows}

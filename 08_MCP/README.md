@@ -175,7 +175,10 @@ What is Streamable HTTP transport in MCP, and why might you expose a server publ
 
 #### Answer
 
-_(insert your answer here)_
+- mcp servers need a way to communicate with the clients
+- Streamable http means server is able to push data via server side events as it becomes available in stead of waiting for the entire response to be generated before sending to the client. Note, tools can be long running so we don't want user to wait for the full response to be generate. Streamable HTTP allows us to stream response as it becomes available
+- stdio can only work when client and server are running on the same machine. Streamable HTTP works across the network and allows multiple clients to connect to our mcp server. We can host it on remote machine and connect from anywhere. 
+- oauth we add because once our server is publicly accessbile anyone can access our tools and without oauth we have no way of verifying who is calling it and oauth solves that by requiring callers to be authenticated before they can access our resources. with that we can also scope what that authenticated user will have access to in terms of our tools
 
 ## Activity 1: Extend the MCP Server
 
