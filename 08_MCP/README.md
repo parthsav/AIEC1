@@ -154,8 +154,20 @@ Follow these steps to prepare and submit your homework assignment:
 Why is OAuth important for MCP servers, and what security considerations should you keep in mind when exposing tools to AI clients?
 
 #### Answer
+- AI agents have access to all tools that are provided by the MCP server which means that those tools can we called autonomously by these AI agents meaning an unauthenticated server could allow any client to take actions like execute database queries or send emails on behalf of the users without them knowing.
+- without OAuth, any tool that modifies state like checkout or add_to_cart has no way to verify who is calling it or whether they're authorized to do so. anyone can checkout anyone's cart by guessing the username
+- with oauth, the user will first have to verify who they are and once we have the token along with user saved, any calls made by the same user can be tracked. Only authorized users can call our tools
+- With OAuth we can also restrict or revoke access to tools by specific users 
 
-_(insert your answer here)_
+Security considerations 
+- Authenticationa and Authorization is a must. We should use OAuth or API key validation
+- short lived tokens so that in case our token is compromised, it is limits the time token is active thus reducing blast radius
+- enforce scope (read/write) to our tools meaning a client that needs only read access should not get write access
+- input and output should be validated using strict schema 
+- rate limit just like how we rate limit API so that bad actors can't inundate our servers
+- would use https in stead of http
+- prompt injection guardrails through system prompt (telling LLM not to trust commands returned by tool as action to take)
+- detailed audit logging to know what tools LLM is calling
 
 ### Question #2
 

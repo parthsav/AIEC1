@@ -9,7 +9,7 @@ from mcp.server.fastmcp import FastMCP
 
 from .oauth import CatShopOAuthProvider
 
-ISSUER_URL = os.environ.get("ISSUER_URL", "http://localhost:8000")
+ISSUER_URL = os.environ.get("ISSUER_URL", "https://savage-clash-geography.ngrok-free.dev")
 
 oauth_provider = CatShopOAuthProvider(issuer_url=ISSUER_URL)
 

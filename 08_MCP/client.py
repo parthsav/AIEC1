@@ -15,7 +15,7 @@ from mcp.shared.auth import OAuthClientInformationFull, OAuthClientMetadata, OAu
 from pydantic import AnyUrl
 
 
-DEFAULT_SERVER_URL = "http://localhost:8000"
+DEFAULT_SERVER_URL = "https://savage-clash-geography.ngrok-free.dev/"
 DEFAULT_MODEL = "gpt-5.4-mini"
 SYSTEM_PROMPT = """You are a helpful Cat Shop assistant.
 
