@@ -1,0 +1,35 @@
+# Python / uv
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.python-version-local
+
+# Secrets — inject at runtime via Vercel env vars or docker --env-file
+.env
+.env.*
+!.env.example
+
+# Git / editor
+.git/
+.idea/
+.vscode/
+.claude/
+
+# Frontend is deployed separately on Vercel (Next.js)
+frontend/
+
+# Course materials — not needed in the agent image
+lessons/
+learning-records/
+assets/
+*.html
+NOTES.md
+MISSION.md
+RESOURCES.md
+
+# LangGraph local dev cache
+.langgraph_api/
+
+# OS
+.DS_Store

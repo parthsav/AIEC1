@@ -23,8 +23,22 @@ inner_agent = create_agent(
         model=get_chat_model(),
         tools=get_tool_belt(),
         system_prompt=SYSTEM_PROMPT,)
-    
 
+
+def message_text(content: object) -> str:
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        parts: list[str] = []
+        for block in content:
+            if isinstance(block, str):
+                parts.append(block)
+            elif isinstance(block, dict) and block.get("text"):
+                parts.append(str(block["text"]))
+        return "".join(parts)
+    return str(content)
+
+    
 def prettify(state: dict, label: str = "state") -> None:
     print(f"┌── {label}")
     for key, value in state.items():
@@ -73,7 +87,7 @@ Answer:
 
 Reply with exactly one word: yes or no."""
 
-judge_model = get_chat_model()
+judge_model = get_chat_model().with_config({"tags": ["nostream"]})
 
 
 def judge_helpfulness(state: dict) -> dict:
@@ -84,17 +98,18 @@ def judge_helpfulness(state: dict) -> dict:
         print("---> hit max loop count, accepting the answer as-is")
         return {"loop_count": loop_count, "helpful": "yes"}
 
-    question = next(
-        m.content for m in state["messages"] if isinstance(m, HumanMessage)
+    question = message_text(
+        next(m.content for m in state["messages"] if isinstance(m, HumanMessage))
     )
-    answer = state["messages"][-1].content
+    answer = message_text(state["messages"][-1].content)
 
     judge_prompt = JUDGE_PROMPT.format(question=question, answer=answer)
     print("---> judge prompt:\n", judge_prompt)
 
     judge_response = judge_model.invoke(judge_prompt)
-    decision = "yes" if judge_response.content.strip().lower().startswith("yes") else "no"
-    print(f"---> judge said {judge_response.content!r} -> {decision}")
+    judge_text = message_text(judge_response.content)
+    decision = "yes" if judge_text.strip().lower().startswith("yes") else "no"
+    print(f"---> judge said {judge_text!r} -> {decision}")
     return {"loop_count": loop_count, "helpful": decision}
 
 

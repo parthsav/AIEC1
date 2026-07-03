@@ -1,0 +1,9 @@
+{
+  "build": {
+    "env": {
+      "LANGGRAPH_API_URL": "https://placeholder.us.langgraph.app",
+      "LANGSMITH_API_KEY": "build-placeholder",
+      "NEXT_PUBLIC_API_URL": "/api"
+    }
+  }
+}
