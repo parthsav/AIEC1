@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import re
+
 from langchain.agents import create_agent
 from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 from langgraph.graph import StateGraph, START, END
@@ -72,12 +74,27 @@ def generate_answer(state: dict) -> dict:
 
 
 MAX_LOOP_COUNT = 2
+HELPFULNESS_THRESHOLD = 4
 
-JUDGE_PROMPT = """You grade whether an assistant's answer is helpful for the user's question.
+JUDGE_PROMPT = """You grade how helpful an assistant's answer is for the user's question,
+on an integer scale from 1 (unhelpful) to 5 (excellent).
 
 The assistant is a cat-health specialist and is supposed to decline questions
-that are not about cat health. If the question is off-topic and the assistant
-politely declined, that counts as helpful (yes).
+that are not about cat health. A polite, on-topic decline of an off-topic
+question scores 5.
+
+For on-topic cat-health questions, you are strict about tool grounding:
+- 5: directly answers the specific question, is concrete/actionable, AND is
+     clearly grounded in the "Tool results" shown below (the answer draws on
+     facts that appear in those results, not just the model's own claims)
+- 3-4: reasonably on-topic and concrete, but not clearly backed by the tool
+       results (no tool was called, or the answer ignores what the tools
+       returned)
+- 1-2: vague, generic, mostly a deflection, or off-topic and not declined
+
+An ungrounded answer should not score a 5 even if it reads well. If no tools
+were called for a question that plainly needed factual/medical grounding,
+cap the score at 3.
 
 Question:
 {question}
@@ -85,9 +102,24 @@ Question:
 Answer:
 {answer}
 
-Reply with exactly one word: yes or no."""
+Tool results used for this answer (empty if none were called):
+{tool_context}
+
+Reply with exactly one integer from 1 to 5, and nothing else."""
 
 judge_model = get_chat_model().with_config({"tags": ["nostream"]})
+
+
+def tool_context_for_last_answer(messages: list) -> str:
+    last_human_idx = max(
+        i for i, m in enumerate(messages) if isinstance(m, HumanMessage)
+    )
+    tool_messages = [
+        m for m in messages[last_human_idx:] if isinstance(m, ToolMessage)
+    ]
+    if not tool_messages:
+        return "(no tools were called)"
+    return "\n\n".join(f"[{m.name}]: {message_text(m.content)}" for m in tool_messages)
 
 
 def judge_helpfulness(state: dict) -> dict:
@@ -102,14 +134,19 @@ def judge_helpfulness(state: dict) -> dict:
         next(m.content for m in state["messages"] if isinstance(m, HumanMessage))
     )
     answer = message_text(state["messages"][-1].content)
+    tool_context = tool_context_for_last_answer(state["messages"])
 
-    judge_prompt = JUDGE_PROMPT.format(question=question, answer=answer)
+    judge_prompt = JUDGE_PROMPT.format(
+        question=question, answer=answer, tool_context=tool_context
+    )
     print("---> judge prompt:\n", judge_prompt)
 
     judge_response = judge_model.invoke(judge_prompt)
     judge_text = message_text(judge_response.content)
-    decision = "yes" if judge_text.strip().lower().startswith("yes") else "no"
-    print(f"---> judge said {judge_text!r} -> {decision}")
+    match = re.search(r"[1-5]", judge_text)
+    score = int(match.group()) if match else 1
+    decision = "yes" if score >= HELPFULNESS_THRESHOLD else "no"
+    print(f"---> judge said {judge_text!r} -> score {score} -> {decision}")
     return {"loop_count": loop_count, "helpful": decision}
 
 
