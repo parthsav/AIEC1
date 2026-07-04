@@ -443,6 +443,57 @@ The key must live serverside because anything reachable from browser javascript 
 
 Build an `agent_with_helpfulness` graph that adds a post-response helpfulness check: after the agent answers, a judge model decides whether the response is helpful, and if not, the graph loops back for another attempt (with a safe loop limit). Register it in `langgraph.json`, deploy it, then compare LangSmith traces for queries that pass vs. fail the helpfulness check. Does the retry loop behave differently in Studio vs. production?
 
+### Answer
+
+### `agent_with_helpfulness` implementation
+
+`app/graphs/helpfulness_agent.py` implements `agent_with_helpfulness`, a `StateGraph` with two nodes: `generate_answer` and `judge_helpfulness`.
+
+The `generate_answer` node runs the cat-health ReAct agent with its retrieval tools. After it produces a response, `judge_helpfulness` evaluates the answer on a 1–5 scale using a `HELPFULNESS_THRESHOLD` of 4. The judge is intentionally strict about grounding: an answer only receives a high score if it is supported by information returned by the retrieval or search tools, rather than relying solely on the model's own knowledge. The only exception is off-topic questions—if the agent politely declines those, they automatically receive a score of 5.
+
+If the score falls below the threshold, `route_after_judge` sends execution back to `generate_answer` for another attempt. To prevent infinite retries, `MAX_LOOP_COUNT` is set to 2. Once that limit is reached, the response is force-accepted even if it still doesn't meet the helpfulness threshold.
+
+### Registration and deployment
+
+The graph is registered in `langgraph.json` under `assistants.agent_with_helpfulness` alongside the existing `simple_agent`.
+
+It was deployed using:
+
+```bash
+uv run langgraph deploy --name cat-health-agent
+```
+
+to LangSmith Deployments (BYOC, Developer plan).
+
+### Trace comparison: pass vs. fail
+
+**Pass — "How often should I deworm my cat?"**
+
+The agent called `retrieve_information`, retrieved the relevant guidance from the AAHA/AAFP Feline Life Stage Guidelines, and returned a specific deworming schedule with citations. The judge scored the response 5/5, so it passed immediately with `loop_count: 1`.
+
+**Fail → retry — "Is chocolate toxic to cats?"**
+
+This case was more interesting. The agent correctly called a retrieval tool, but the RAG corpus doesn't include toxicology information, so retrieval returned unrelated litter-box behavior research. The model still answered the question correctly using its own knowledge, but because the response wasn't grounded in the retrieved evidence, the judge gave it a 3/5 and triggered a retry.
+
+The second attempt produced essentially the same answer. Since the underlying knowledge base still lacked the necessary information, regenerating couldn't improve the grounding. After reaching `MAX_LOOP_COUNT` (`loop_count: 2`), the graph force-accepted the response.
+
+I like this example because it demonstrates a genuine failure mode without relying on adversarial prompts or jailbreaks. A completely ordinary user question exposed a real gap in the retrieval corpus—the absence of toxicology content—and the helpfulness judge behaved exactly as intended.
+
+### Does the retry loop behave differently in Studio vs. production?
+
+The retry loop itself behaves the same in both environments. The graph executes the same sequence—`generate_answer` → `judge_helpfulness` → conditional routing—with the same retry logic and `MAX_LOOP_COUNT`. There isn't a separate implementation for Studio versus production.
+
+The difference appeared when testing concurrency.
+
+I sent two requests to the same conversation thread on the deployed backend almost simultaneously. The LangGraph Platform's default `multitask_strategy` is `enqueue`, so instead of rejecting the second request or running it in parallel, it queues it until the first request finishes.
+
+The important detail is that the queued request inherits the conversation state produced by the first request. In my test, I asked, "Can cats eat grapes?" immediately after a conversation about chocolate toxicity. Although the grapes question was perfectly valid, the agent incorrectly declined it as off-topic because it was evaluated in the context of the previous exchange. When I asked the exact same question in a fresh thread, it produced the expected grounded answer.
+
+This behavior is effectively production-only. Studio testing is inherently serial—you interact with the graph one request at a time—so there isn't a second request waiting in the queue to inherit updated conversation state. In production, however, this situation is easy to create through a double-click on **Send**, a client-side retry after a slow response, or multiple browser tabs using the same conversation thread.
+
+So while the retry loop itself is identical in Studio and production, production introduces shared-thread concurrency that can expose interaction patterns and edge cases that Studio's testing workflow simply cannot reproduce.
+
+
 ## Advanced Activity: Auth and Custom Routes
 
 Research [LangSmith Deployments custom routes](https://github.com/langchain-samples/lsd-custom-route-react-ui) and describe how you could add authentication so each user only sees their own threads. Optionally implement a simple auth gate on your Vercel frontend.
