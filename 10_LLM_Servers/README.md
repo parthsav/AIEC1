@@ -83,15 +83,22 @@ What is the difference between serverless and dedicated endpoints?
 
 #### ✅ Answer:
 
-_(insert your answer here)_
+Serverless endpoints run on shared, provider-managed infrastructure. You send requests to a public model endpoint (for example, accounts/fireworks/models/gpt-oss-20b similar to one we used in endpoint_slammer.ipynb) and pay only for the tokens or requests you use. There's no need to provision GPUs or manage infrastructure, and you can start using the model immediately. Since the underlying compute is shared with other customers, latency and throughput can fluctuate during periods of high demand. On the plus side, there are no idle infrastructure costs.
+
+Dedicated (on-demand) endpoints reserve compute exclusively for your deployment, for example by creating a deployment with `firectl create deployment` and configuring `min-replica` and `max-replica`. This gives you dedicated capacity, more consistent latency, predictable performance under concurrent load, and control over how your deployment scales. The trade off is cost: you pay for the reserved replicas even when they're idle, so it's important to shut down the deployment when you're finished to avoid unnecessary charges.
+
 
 ### ❓ Question #2:
 
 Why is it important to consider token throughput and latency when choosing an LLM for user-facing applications?
 
 #### ✅ Answer:
+User facing applications are evaluated in real time so responsiveness is necessary. User expects answers to beging stream within few seconds as supposed to minutes. Latency which means the time taken for first token and total response time has a direct impact on the user experience. If we have high latency it makes our chatbots, search and our application in general feel slow or unreliatble increasing the likelihood of people abondoning our app.
 
-_(insert your answer here)_
+**Token throughput**, measured in tokens generated per second, determines how quickly a complete response is delivered and how many users an endpoint can handle simultaneously. Higher throughput allows responses to finish faster and supports more concurrent requests. Lower throughput, on the other hand, leads to longer wait times and reduces the number of requests an endpoint can serve before requests begin queueing or timing out, as demonstrated by the `endpoint_slammer.ipynb` stress test.
+
+When choosing an LLM endpoint, it's important to balance model quality with performance. A highly capable but slower model may be perfectly suitable for offline or batch processing, where response time isn't critical. For interactive applications, however, low latency and sufficient throughput are essential to deliver a responsive experience under expected user traffic.
+
 
 ## Activity 1: RAGAS Evaluation with Cost Analysis
 
