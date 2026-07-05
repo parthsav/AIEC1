@@ -1,0 +1,18 @@
+[
+  {
+    "question": "What practical advice do the feline life stage guidelines give for getting more useful patient histories and helping cat owners feel less overwhelmed during a veterinary visit?",
+    "ground_truth": "The guidelines say that a major challenge in delivering regular feline healthcare is that cat owners can become overwhelmed at veterinary visits, so the practice team should communicate that the owner is an integral part of the healthcare team to strengthen the veterinary-client-patient relationship, and use structured, life-stage-specific history taking to make visits feel more manageable and to gather more useful information."
+  },
+  {
+    "question": "How do the recommendations for environmental enrichment for cats, together with the discussion of feline behavior and welfare, inform what veterinarians should advise owners about scratching, intercat conflict, play, and punishment in the home?",
+    "ground_truth": "The context recommends that cats be provided with scratching posts and a variety of other scratching surfaces as soon as they enter the home, because meeting the cat's environmental needs may help reduce scratching of unwanted surfaces. It also notes that intercat-related issues should be identified and addressed with appropriate resource provisioning and separation, that play should be encouraged as a healthy behavioral outlet, and that punishment should be avoided since it can worsen behavior problems and damage the human-animal bond."
+  },
+  {
+    "question": "According to the 2021 AAHA/AAFP Feline Life Stage Guidelines, how should a veterinarian combine life-stage-specific history taking and client education to support early detection of disease, and what key topics should be emphasized for mature adult and senior cats as part of that approach?",
+    "ground_truth": "The 2021 AAHA/AAFP Feline Life Stage Guidelines state that every life stage has specific items that should be discussed during the veterinary visit, and that veterinary technicians and veterinarians should be familiar with current recommendations and practice protocols so they can educate clients on life-stage-appropriate care. For mature adult and senior cats, this should emphasize topics such as weight and body condition changes, early detection of chronic disease (including renal, thyroid, and cardiac conditions), pain and mobility assessment, and recommended diagnostic screening appropriate to that life stage."
+  },
+  {
+    "question": "What does the ACVIM guidance say about systemic hypertension in cats, and which other cat-care guideline listed alongside it points to more detailed management information?",
+    "ground_truth": "The context lists the ACVIM consensus statement on the identification, evaluation, and management of systemic hypertension in dogs and cats. It also says that additional considerations for diagnosis and management of diseases in mature adult and senior cats are described in the AAFP Senior Care Guidelines."
+  }
+]

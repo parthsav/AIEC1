@@ -40,7 +40,7 @@ class _RAGState(TypedDict):
     response: str
 
 
-def _build_rag_graph(data_dir: str):
+def _build_rag_graph(data_dir: str, provider: str = "fireworks"):
     """Construct and compile a minimal RAG graph.
 
     Steps:
@@ -49,6 +49,10 @@ def _build_rag_graph(data_dir: str):
     3) Create embeddings and an in-memory Qdrant vector store retriever.
     4) Define a chat prompt and generation model.
     5) Wire a two-node graph: retrieve -> generate.
+
+    `provider` selects which embedding + chat models back the pipeline:
+    - "fireworks": Fireworks-hosted open-source models (qwen3-embedding-8b, gpt-oss-20b)
+    - "openai": OpenAI-hosted models (text-embedding-3-small, gpt-4.1-mini)
     """
     # Load PDFs from data directory (recursive)
     try:
@@ -67,34 +71,41 @@ def _build_rag_graph(data_dir: str):
     )
     chunks = text_splitter.split_documents(documents) if documents else []
 
-    # Embeddings and vector store (in-memory Qdrant)
-    embedding_model = OpenAIEmbeddings(
-        model=os.environ.get("FIREWORKS_EMBEDDING_MODEL", "accounts/fireworks/models/qwen3-embedding-8b"),
-        openai_api_key=os.environ["FIREWORKS_API_KEY"],
-        openai_api_base="https://api.fireworks.ai/inference/v1",
-        check_embedding_ctx_length=False,
-        dimensions=4096,
-    )
+    # Embeddings and generator model, selected by provider
+    if provider == "fireworks":
+        embedding_model = OpenAIEmbeddings(
+            model=os.environ.get("FIREWORKS_EMBEDDING_MODEL", "accounts/fireworks/models/qwen3-embedding-8b"),
+            openai_api_key=os.environ["FIREWORKS_API_KEY"],
+            openai_api_base="https://api.fireworks.ai/inference/v1",
+            check_embedding_ctx_length=False,
+            dimensions=4096,
+        )
+        generator_llm = ChatOpenAI(
+            model=os.environ.get("FIREWORKS_CHAT_MODEL", "accounts/fireworks/models/gpt-oss-20b"),
+            openai_api_key=os.environ["FIREWORKS_API_KEY"],
+            openai_api_base="https://api.fireworks.ai/inference/v1",
+        )
+    elif provider == "openai":
+        embedding_model = OpenAIEmbeddings(model="text-embedding-3-small")
+        generator_llm = ChatOpenAI(model="gpt-4.1-mini", temperature=0)
+    else:
+        raise ValueError(f"unknown provider: {provider!r}")
+
     qdrant_vectorstore = QdrantVectorStore.from_documents(
         documents=chunks,
         embedding=embedding_model,
         location=":memory:",
-        collection_name="rag_collection",
+        collection_name=f"rag_collection_{provider}",
     )
     retriever = qdrant_vectorstore.as_retriever()
 
-    # Prompt and model
+    # Prompt
     human_template = (
         "\n#CONTEXT:\n{context}\n\nQUERY:\n{query}\n\n"
         "Use the provide context to answer the provided user query. "
         "Only use the provided context to answer the query. If you do not know the answer, or it's not contained in the provided context respond with \"I don't know\""
     )
     chat_prompt = ChatPromptTemplate.from_messages([("human", human_template)])
-    generator_llm = ChatOpenAI(
-        model=os.environ.get("FIREWORKS_CHAT_MODEL", "accounts/fireworks/models/gpt-oss-20b"),
-        openai_api_key=os.environ["FIREWORKS_API_KEY"],
-        openai_api_base="https://api.fireworks.ai/inference/v1",
-    )
 
     def retrieve(state: _RAGState) -> _RAGState:
         retrieved_docs = retriever.invoke(state["question"]) if retriever else []
@@ -113,11 +124,11 @@ def _build_rag_graph(data_dir: str):
     return graph_builder.compile()
 
 
-@lru_cache(maxsize=1)
-def _get_rag_graph():
-    """Return a cached compiled RAG graph built from RAG_DATA_DIR."""
+@lru_cache(maxsize=2)
+def get_rag_graph(provider: str = "fireworks"):
+    """Return a cached compiled RAG graph built from RAG_DATA_DIR for the given provider."""
     data_dir = os.environ.get("RAG_DATA_DIR", "data")
-    return _build_rag_graph(data_dir)
+    return _build_rag_graph(data_dir, provider=provider)
 
 
 @tool
@@ -125,7 +136,7 @@ def retrieve_information(
     query: Annotated[str, "query to ask the retrieve information tool"],
 ):
     """Use Retrieval Augmented Generation to retrieve information about feline health, including life stage care, nutrition, vaccinations, parasite control, behavior, diagnostics, and veterinary guidelines for cats."""
-    graph = _get_rag_graph()
+    graph = get_rag_graph("fireworks")
     result = graph.invoke({"question": query})
     # Prefer returning the response string if available
     if isinstance(result, dict) and "response" in result:

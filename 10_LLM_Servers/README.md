@@ -106,6 +106,38 @@ Use RAGAS to evaluate your open-source Fireworks AI powered RAG app against an O
 
 Additionally, instrument both pipelines with **LangSmith** to capture token usage and cost per query. Use LangSmith's tracing and cost dashboards to compare the total cost of running each provider at scale. Include your evaluation results, cost breakdown, and analysis in your Loom video.
 
+#### ✅ Answer
+
+**Setup**: `app/rag.py` was parameterized by `provider` (`"fireworks"` vs `"openai"`) so the same retrieve→generate graph runs against either stack — Fireworks' `gpt-oss-20b` + `qwen3-embedding-8b`, or OpenAI's `gpt-4.1-mini` + `text-embedding-3-small`. The test set (4 human-reviewed Q&A pairs) was reused from `05_Synthetic_Data_Generation_for_RAG_Evals`, whose source PDF is byte-identical (same MD5) to this project's `cat-health-guide.pdf`. See `ragas_provider_eval.ipynb` for the full run.
+
+**RAGAS results** (judge fixed to OpenAI `gpt-4.1-mini` for both, so the comparison isolates the pipeline, not the grader):
+
+| Metric | Fireworks (gpt-oss-20b) | OpenAI (gpt-4.1-mini) |
+|---|---|---|
+| context_precision | 0.979 | 0.979 |
+| context_recall | 0.750 | 0.938 |
+| faithfulness | 0.599 | 1.000 |
+| answer_correctness | 0.450 | 0.559 |
+
+Retrieval quality is nearly identical (same chunking/retriever code, only the embedding model differs) — both models are looking at essentially the same evidence. The real gap is faithfulness — `gpt-oss-20b`'s answers drift from the retrieved context noticeably more than `gpt-4.1-mini`'s do, even when the correct context was retrieved. `answer_correctness` is low for both in absolute terms (RAGAS penalizes wording that doesn't closely match the reference answer, even when the content is right), but the ~0.11 gap between them here is wide enough to not dismiss as noise the way it was at n=4 in an earlier run.
+
+**Cost breakdown** (pulled from LangSmith via API, not the UI — token counts and, for OpenAI, cost are LangSmith's own numbers; Fireworks priced manually since LangSmith has no built-in pricing for it. Each project now holds 8 accumulated runs across two notebook executions — figures below use only the 4 most recent runs per project, matching the RAGAS scores above):
+
+| | Fireworks (gpt-oss-20b) | OpenAI (gpt-4.1-mini) |
+|---|---|---|
+| Avg. generation cost / query | $0.00058 | $0.00186 |
+| Rate used | $0.07 / $0.30 per 1M in/out tokens | LangSmith's built-in OpenAI pricing |
+| One-time indexing cost (42 chunks, ~24.2k tokens, embedded once) | $0.0024 (`qwen3-embedding-8b` @ $0.10/1M) | $0.0005 (`text-embedding-3-small` @ $0.02/1M) |
+| Projected at 10,000 queries/day for 30 days (generation only) | ~$172.50/mo | ~$559.35/mo |
+
+OpenAI's `gpt-4.1-mini` costs about **3.2x more per query** than Fireworks' `gpt-oss-20b` for generation in this test, and its embedding model is actually *cheaper* per token than Fireworks' — the cost gap is almost entirely in chat generation pricing, not embeddings.
+
+**Analysis**: at this traffic volume, the open-source route saves roughly $387/month over OpenAI, but comes with a real, measured drop in faithfulness (answers straying from the source guide more often) and a real gap in answer correctness. For a cat-health information product, unfaithful or incorrect answers are a bigger risk than in a lower-stakes domain — so the 3x cost premium is likely justified here to keep answers grounded in the veterinary guide. For a use case where occasional drift is more tolerable, Fireworks' cost advantage would be the deciding factor. This test set (n=4) is still small — a larger, harder eval set (adversarial questions, multi-hop questions) would be the next step before committing to either provider in production.
+
+**Two build notes worth keeping**:
+- The first attempt at splitting LangSmith projects by reassigning `os.environ["LANGSMITH_PROJECT"]` mid-run silently failed — both providers' traces landed in one project, because LangSmith resolves the project once per process and doesn't re-read the env var after the first trace. Fixed by wrapping each provider's run in `langsmith.tracing_context(project_name=...)`, which scopes the project correctly per call.
+- Re-running the same notebook produced noticeably different scores the second time (faithfulness moved from 0.457→0.599, answer_correctness from 0.393/0.425→0.450/0.559) — the Fireworks branch doesn't pin `temperature`, so its generations vary run to run, and the RAGAS judge itself is an LLM call with its own sampling variance. Neither run is "the" answer; both point the same direction (OpenAI more faithful and more correct, Fireworks cheaper), but exact numbers should be read as one sample, not a fixed ground truth — pin `temperature=0` on the Fireworks branch too if you want tighter run-to-run repeatability.
+
 ## Advanced Activity: Local Models
 
 Swap out the Fireworks AI endpoints for **locally-running open-source models** using [Ollama](https://ollama.com/) or another local inference server of your choice. Run both your embedding model and your chat model locally, and rebuild the RAG pipeline on top of them.
