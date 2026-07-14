@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Codebase Concierge</title>
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar">
+      <button id="new-conv-btn" class="new-conv-btn">+ New conversation</button>
+      <div id="conv-list" class="conv-list"></div>
+    </aside>
+
+    <main class="chat">
+      <header class="chat-header">
+        <h1>Codebase Concierge</h1>
+        <p id="chat-subtitle" class="subtitle">Ask a question about the target repo</p>
+      </header>
+
+      <div id="messages" class="messages"></div>
+
+      <form id="chat-form" class="chat-form">
+        <input
+          id="chat-input"
+          type="text"
+          autocomplete="off"
+          placeholder="Ask about the codebase..."
+        />
+        <button type="submit" id="send-btn">Send</button>
+      </form>
+    </main>
+  </div>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>

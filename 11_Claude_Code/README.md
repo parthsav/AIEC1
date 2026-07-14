@@ -66,7 +66,9 @@ While scaffolding in Task 3 you used **plan mode** before letting Claude Code wr
 
 #### ✅ Answer
 
-_(insert your answer here)_
+A permission system exists because "can execute shell commands" and "should execute this particular shell command right now" are different questions, and only a human can reliably answer the second one for consequential or irreversible actions (`rm -rf`, a force-push, an `ALTER TABLE`). The model is very good at picking a plausible next tool call, but it has no skin in the game and no ground truth about what's actually safe in *your* environment — a gate that gives a human the chance to say "wait, not that" before anything runs is the cheapest possible insurance against an entire class of mistakes.
+
+Plan mode is especially valuable on an empty directory because there's no existing code to anchor a conversation about "is this right?" — normally you could point at a diff and say "this line is wrong." With nothing there yet, the only thing to review *is* the plan: file layout, framework choices, where the seams go (e.g. the isolated echo-stub function in Task 3). Read-only mode forces that conversation to happen in words, before any of it is baked into files you'd otherwise have to unwind. It's much cheaper to say "actually, make the stub a separate function" in a plan than to ask for a refactor five files later.
 
 ### ❓ Question #2
 
@@ -74,7 +76,9 @@ _(insert your answer here)_
 
 #### ✅ Answer
 
-_(insert your answer here)_
+`CLAUDE.md` should hold what's expensive to rediscover and cheap to state: the run/verify commands, the one or two architectural decisions that aren't obvious from the file tree (e.g. "the chat logic lives in one swappable function; `/api/chat` is the seam where the agent gets wired in"), and conventions the codebase can't self-enforce (plain JS, no frameworks). It should *not* contain anything a `Read` or `Glob` call would surface on its own — file listings, function signatures, long prose walkthroughs — because that's stale the moment the code changes, and every line in it is paid for in every single future session whether or not that session needs it.
+
+That's exactly the tradeoff from Session 3: it's a fixed-size, always-loaded context budget, the same problem summarization middleware and checkpointers solve for a running conversation. The difference is *when* the compression happens — a checkpointer trims history live, mid-conversation; `CLAUDE.md` is compression done once, by hand, ahead of time, for information that's true across every session rather than specific to one. Writing a good one is the same skill as writing a good conversation summary: keep the load-bearing facts, drop everything derivable or transient.
 
 ### ❓ Question #3
 
@@ -82,7 +86,9 @@ The Agent SDK gives you the same agent loop that powers Claude Code. Compare thi
 
 #### ✅ Answer
 
-_(insert your answer here)_
+Building `chat-app`, the entire read/search/tool-call loop — including retries, context compaction, and the plumbing that turns a raw model response into typed `AssistantMessage`/`ToolUseBlock`/`ResultMessage` events — came from one `query()` call and about 40 lines of code in `agent.py`. In LangGraph I'd have hand-built the node that calls the model, the conditional edge that routes to tools vs. END, the tool-execution node, and the state object threading messages between them — useful when you need that, wasted effort when you don't. Session persistence was similarly free: `resume=session_id` (Task 7) replaces a checkpointer I would otherwise have wired up myself.
+
+What I gave up is topology and provider choice. A LangGraph graph can branch into parallel subagents, loop back conditionally, insert a human-approval node mid-flight, or call a non-Claude model for one step — arbitrary shapes. The SDK gives you one shape: a single agent loop, Claude-only, configured through `ClaudeAgentOptions` rather than assembled from graph primitives. For "codebase concierge" that loop is exactly the right shape, so the trade was free. It stops being free the moment a task needs a topology the loop doesn't have — e.g. the Session 4 multi-agent researcher's fan-out/fan-in over parallel subagents isn't something `ClaudeAgentOptions` can express; you'd be back to LangGraph (or the SDK's own subagent feature, which is narrower).
 
 ### ❓ Question #4
 
@@ -90,7 +96,9 @@ Your chat app could have called a chat completions API directly, the way you did
 
 #### ✅ Answer
 
-_(insert your answer here)_
+A plain chat completion only ever produces text — it can *describe* what's in `agent.py`, but it can't actually open the file, so every answer is a guess grounded in whatever was in the prompt. Routing through `query()` gets the app real, current facts: `Read`/`Glob`/`Grep` let it cite `agent.py:41-47` for a claim instead of hallucinating it, and it can page through files far larger than would ever fit in one prompt.
+
+The new risk is exactly that capability: a chat completion has no way to touch the filesystem no matter what a user types, but an agent with tools does — pointed at a shell or write access, a crafted message becomes a path to running commands or overwriting files on a server with no human watching. My `chat-app` addresses this the same way the guide frames it — since there's no human in the loop to click "approve" on a server, the tool allowlist *is* the permission gate: `ALLOWED_TOOLS` in `server/agent.py` is `Read`, `Grep`, `Glob`, and the two custom tools only, so the agent is structurally incapable of writing or executing anything, regardless of what's asked of it. `max_turns=25` bounds a single request so no query can loop indefinitely and run up cost or hang the server, and the whole `query()` call is wrapped in a `try/except` so a tool failure or API error becomes a normal chat reply instead of a 500 or a stack trace leaking back to the browser.
 
 ## Activity 1: Level Up the Chat App
 
