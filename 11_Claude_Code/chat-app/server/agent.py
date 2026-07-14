@@ -38,10 +38,13 @@ If a question can't be answered from this repository, say so plainly instead of 
 
 _concierge_server = build_concierge_server()
 
+# `tools` restricts which built-ins exist at all; `allowed_tools` only
+# auto-approves. Both are needed: without `tools`, the full Claude Code
+# toolset (Bash included) is still reachable through the permission flow.
+BUILTIN_TOOLS = ["Read", "Glob", "Grep"]
+
 ALLOWED_TOOLS = [
-    "Read",
-    "Glob",
-    "Grep",
+    *BUILTIN_TOOLS,
     "mcp__concierge__count_lines",
     "mcp__concierge__git_log",
 ]
@@ -50,7 +53,9 @@ ALLOWED_TOOLS = [
 def _build_options(resume_session_id: str | None) -> ClaudeAgentOptions:
     return ClaudeAgentOptions(
         system_prompt=SYSTEM_PROMPT,
+        tools=BUILTIN_TOOLS,
         allowed_tools=ALLOWED_TOOLS,
+        permission_mode="dontAsk",
         cwd=TARGET_REPO_PATH,
         max_turns=MAX_TURNS,
         mcp_servers={"concierge": _concierge_server},

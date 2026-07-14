@@ -6,7 +6,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from sse_starlette.sse import EventSourceResponse
 
-from server.agent import run_agent, stream_agent_events, store
+from server.agent import TARGET_REPO_PATH, run_agent, stream_agent_events, store
 
 app = FastAPI(title="Codebase Concierge")
 
@@ -22,6 +22,11 @@ class ChatRequest(BaseModel):
 @app.get("/")
 async def index():
     return FileResponse(f"{STATIC_DIR}/index.html")
+
+
+@app.get("/api/health")
+async def health():
+    return {"status": "ok", "target_repo": TARGET_REPO_PATH}
 
 
 @app.post("/api/chat")

@@ -72,6 +72,7 @@ async function sendMessage(message) {
 
   const assistantBubble = addBubble("assistant", "…");
   let assistantText = "";
+  let gotResult = false;
 
   try {
     const res = await fetch("/api/chat/stream", {
@@ -87,7 +88,9 @@ async function sendMessage(message) {
     while (true) {
       const { done, value } = await reader.read();
       if (done) break;
-      buffer += decoder.decode(value, { stream: true });
+      // SSE allows \r\n line endings (sse-starlette uses them) — normalize
+      // so the \n\n event-separator search below works.
+      buffer = (buffer + decoder.decode(value, { stream: true })).replace(/\r\n/g, "\n");
 
       let sep;
       while ((sep = buffer.indexOf("\n\n")) !== -1) {
@@ -117,6 +120,7 @@ async function sendMessage(message) {
           assistantBubble.textContent = assistantText;
           messagesEl.scrollTop = messagesEl.scrollHeight;
         } else if (event.type === "result") {
+          gotResult = true;
           currentConversationId = event.conversation_id;
           assistantBubble.textContent = event.reply;
           assistantBubble.className = event.is_error ? "msg error" : "msg assistant";
@@ -124,8 +128,15 @@ async function sendMessage(message) {
         }
       }
     }
+
+    if (!gotResult) {
+      assistantBubble.textContent =
+        "The connection to the server dropped before an answer arrived — is the server still running? Try sending again.";
+      assistantBubble.className = "msg error";
+    }
   } catch (err) {
-    assistantBubble.textContent = "Connection error talking to the concierge.";
+    assistantBubble.textContent =
+      "Couldn't reach the server. Make sure it's running (uv run uvicorn server.main:app) and try again.";
     assistantBubble.className = "msg error";
   } finally {
     sendBtn.disabled = false;
