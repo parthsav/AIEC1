@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lesson 8 · Owning the activities (your Loom prep)</title>
+<link rel="stylesheet" href="../assets/course.css">
+<script src="../assets/stepper.js" defer></script>
+<style>
+  .askdid { display: flex; gap: .8rem; flex-wrap: wrap; font-family: var(--sans); font-size: .82rem; }
+  .askdid .col { flex: 1 1 250px; border-radius: 10px; overflow: hidden; border: 1.5px solid var(--line); }
+  .askdid .col h4 { color: #fff; padding: .45rem .8rem; font-size: .8rem; }
+  .askdid .col .body { padding: .7rem .9rem; line-height: 1.75; }
+  .ranking { font-family: var(--mono); font-size: .74rem; background: var(--code-bg); border: 1px solid var(--line); border-radius: 8px; padding: .7rem .9rem; line-height: 1.9; overflow-x: auto; }
+  .hitA { background: var(--green-soft); border-radius: 3px; padding: 1px 4px; }
+  .missB { background: #f7e6e3; border-radius: 3px; padding: 1px 4px; }
+  details.beat { border: 1.5px solid var(--line); border-radius: 8px; margin-top: .6rem; font-family: var(--sans); font-size: .88rem; }
+  details.beat summary { cursor: pointer; padding: .6rem .9rem; font-weight: 600; color: var(--blue); }
+  details.beat[open] summary { border-bottom: 1px dashed var(--line); }
+  details.beat .say { padding: .7rem .9rem; line-height: 1.65; }
+</style>
+</head>
+<body>
+<main class="lesson">
+
+  <p class="kicker">Multimodal RAG · Lesson 8</p>
+  <h1>Owning the activities</h1>
+  <p class="lede">Two things in one: exactly <em>what the activities asked and what got done</em> — then a rehearsal tool so you can talk about them on your Loom in your own words, not mine.</p>
+  <p class="meta">⏱ about 12 minutes · covers notebook cells 40–42 and 72–74 · goal: ~90 seconds of confident speaking</p>
+
+  <h2>Activity #1 — asked vs. done</h2>
+  <div class="visual">
+    <div class="visual-label">Side-by-side · the assignment and what's in your notebook</div>
+    <div class="askdid">
+      <div class="col" style="border-color:var(--blue);">
+        <h4 style="background:var(--blue);">📋 What it asked</h4>
+        <div class="body">
+          Write <strong>two of your own questions</strong> about ACME — one <em>visual</em> phrasing ("a pie chart of…"), one <em>factual</em>. Run both through Strategies A, B and C. Record <strong>where the rankings differed, and why</strong> — given the tradeoffs table.
+        </div>
+      </div>
+      <div class="col" style="border-color:var(--green);">
+        <h4 style="background:var(--green);">✅ What was done</h4>
+        <div class="body">
+          Two queries went in (cell 41):<br>
+          <strong>Visual:</strong> "a pie chart showing how our spending is split into slices"<br>
+          <strong>Factual:</strong> "How many engineers do we have compared to other departments?"<br>
+          Predictions were made first, then the cell ran — and one prediction <strong>failed</strong>, which became the observation.
+        </div>
+      </div>
+    </div>
+    <div class="visual-caption">The real rankings, from your executed notebook:</div>
+    <div class="ranking">
+Q: a pie chart showing how our spending is split into slices<br>
+&nbsp;&nbsp;A: [<span class="hitA">fig_cloud_cost.png</span>, doc_finance_costs.md, doc_board_notes.md]<br>
+&nbsp;&nbsp;B: [<span class="missB">doc_people_ops.md, doc_board_notes.md, doc_finance_costs.md</span>] ← zero images!<br>
+&nbsp;&nbsp;C: [doc_finance_costs.md, <span class="hitA">fig_cloud_cost.png</span>, doc_board_notes.md]<br><br>
+Q: How many engineers do we have compared to other departments?<br>
+&nbsp;&nbsp;A: [<span class="hitA">fig_headcount_dept.png</span>, doc_people_ops.md, doc_infrastructure.md]<br>
+&nbsp;&nbsp;B: [<span class="missB">doc_people_ops.md, doc_board_notes.md, doc_infrastructure.md</span>] ← zero images again<br>
+&nbsp;&nbsp;C: [doc_people_ops.md, <span class="hitA">fig_headcount_dept.png</span>, doc_infrastructure.md]
+    </div>
+    <div class="visual-caption"><strong>The one-sentence story:</strong> A found the right chart at #1 both times (the cards contained "pie chart" and the headcount numbers) · B returned <em>zero images even for the pie-chart phrasing</em> — the modality gap doesn't care how visually you phrase a question · C recovered the charts at #2 through its separate image store + RRF.</div>
+  </div>
+
+  <h2>Activity #2 — asked vs. done</h2>
+  <div class="visual">
+    <div class="visual-label">Side-by-side · growing the eval, honestly</div>
+    <div class="askdid">
+      <div class="col" style="border-color:var(--blue);">
+        <h4 style="background:var(--blue);">📋 What it asked</h4>
+        <div class="body">
+          Add <strong>two new gold questions</strong> to the Section 8 eval — one whose answer lives in a <em>text doc</em>, one whose answer lives in a <em>chart image</em>. Re-run recall@3. Record <strong>whether any strategy's score moved, and why</strong>.
+        </div>
+      </div>
+      <div class="col" style="border-color:var(--green);">
+        <h4 style="background:var(--green);">✅ What was done</h4>
+        <div class="body">
+          Two gold pairs went in (cell 73):<br>
+          <strong>Text-answerable:</strong> "What did the FY2024 cost review recommend about compute?" → <code>doc_finance_costs.md</code><br>
+          <strong>Pixels-only:</strong> "Which quarter had the lowest revenue?" → <code>fig_revenue_quarterly.png</code>
+        </div>
+      </div>
+    </div>
+    <div class="visual-caption">The real result (n went from 8 → 10 questions):</div>
+    <div class="ranking">
+Strategy A: recall@3 = 1.00&nbsp;&nbsp;(was 1.00)<br>
+Strategy B: recall@3 = <span class="missB">0.30</span>&nbsp;&nbsp;(was 0.25 — exactly ONE new hit out of two)<br>
+Strategy C: recall@3 = 1.00&nbsp;&nbsp;(was 1.00)
+    </div>
+    <div class="visual-caption"><strong>The one-sentence story:</strong> B's rise from 0.25 to 0.30 is one extra hit — it got the <em>text</em> question and missed the <em>image</em> one. B didn't get better; the question mix got friendlier. <strong>An eval is only as honest as its gold set.</strong></div>
+  </div>
+
+  <h2>What the activities were actually teaching</h2>
+  <div class="analogy">
+    <span class="tag">Analogy</span>
+    A driving lesson ends with the instructor saying: <strong>"now you drive, on a route I didn't plan."</strong> Not because your route matters — because <em>choosing and handling it yourself</em> is the skill. The notebook's demo queries were the instructor's route: curated, guaranteed to work. The activities handed you the wheel.
+  </div>
+  <div class="visual">
+    <div class="visual-label">The two reflexes each activity was building</div>
+    <div class="askdid">
+      <div class="col" style="border-color:var(--gold);">
+        <h4 style="background:var(--gold);">🔬 Activity #1 · Question the system</h4>
+        <div class="body">
+          Goal: make you <strong>predict a ranking before running it</strong>, then explain the result from the system's design. The tradeoffs table stops being a thing you read and becomes a thing you <em>reason with</em>. This is the everyday skill of retrieval debugging: weird results come back, and you must say <em>which part of the machine caused them</em>.
+        </div>
+      </div>
+      <div class="col" style="border-color:var(--green);">
+        <h4 style="background:var(--green);">📏 Activity #2 · Question the ruler</h4>
+        <div class="body">
+          Goal: make you <strong>build a piece of the measuring instrument yourself</strong> — and watch the score move for a reason that had nothing to do with the retriever improving. Once you've seen that, "our RAG has 85% recall" always triggers the right question: <em>recall on which questions?</em>
+        </div>
+      </div>
+    </div>
+    <div class="visual-caption">One activity probes the <strong>system</strong>, the other probes the <strong>measurement</strong>. Together they move you from <em>running</em> a pipeline to <em>interrogating</em> one — which is the actual job of an AI engineer.</div>
+  </div>
+
+  <h2>Now rehearse it — out loud</h2>
+  <p>Don't memorize a script; you'll sound like you're reading. Instead: each card below is a <strong>cue</strong>. Say your answer <em>out loud first</em>, then open the reveal and compare. If your version carried the same idea — even in totally different words — that's a pass. That comparison loop is the rehearsal.</p>
+
+  <div class="visual">
+    <div class="visual-label">Rehearsal · Activity #1 in four beats (~45 seconds of speaking)</div>
+    <div class="stepper" id="rehearse1">
+      <div class="step-pane">
+        <div class="step-title">Beat 1 — the setup</div>
+        <p>🎤 <strong>Cue: What did the activity ask, and what were your two queries?</strong> Say it out loud.</p>
+        <details class="beat"><summary>Compare with the beat</summary><div class="say">"The activity asked me to probe the three retrieval strategies with my own questions — one phrased visually, one factually. I used <em>'a pie chart showing how our spending is split into slices'</em> and <em>'how many engineers do we have compared to other departments?'</em>"</div></details>
+      </div>
+      <div class="step-pane">
+        <div class="step-title">Beat 2 — who won and why</div>
+        <p>🎤 <strong>Cue: Which strategy nailed both queries, and what made that possible?</strong></p>
+        <details class="beat"><summary>Compare with the beat</summary><div class="say">"Strategy A put the right chart first both times — because the captions the VLM wrote at ingestion happened to contain exactly what I asked about: the words 'pie chart' and the headcount numbers."</div></details>
+      </div>
+      <div class="step-pane">
+        <div class="step-title">Beat 3 — the surprise (this is your best moment)</div>
+        <p>🎤 <strong>Cue: What surprised you about Strategy B's results?</strong></p>
+        <details class="beat"><summary>Compare with the beat</summary><div class="say">"I expected the pie-chart phrasing to be CLIP's best case — a pie chart is visually unmistakable. Instead B returned zero images for both queries. That's the modality gap: my query is text, so it lands near text no matter how visually I phrase it. The gap is about where the vectors live, not what the words describe."</div></details>
+      </div>
+      <div class="step-pane">
+        <div class="step-title">Beat 4 — the fix in action</div>
+        <p>🎤 <strong>Cue: How did Strategy C recover the charts B lost?</strong></p>
+        <details class="beat"><summary>Compare with the beat</summary><div class="say">"Strategy C keeps a separate image store, so each chart earns an honest rank among images — then RRF merges by placement. Both charts came back at #2. That's the 'separate stores fused by rank' fix for the gap, working live."</div></details>
+      </div>
+      <div class="stepper-controls">
+        <button class="ctl" data-act="back">◀ Back</button>
+        <button class="ctl primary" data-act="next">Next ▶</button>
+        <button class="ctl" data-act="reset">↺ Restart</button>
+        <span class="stepper-progress"></span>
+      </div>
+    </div>
+    <div class="visual-caption">Speak first, reveal second. Run it twice — the second pass is where it becomes yours.</div>
+  </div>
+
+  <div class="visual">
+    <div class="visual-label">Rehearsal · Activity #2 in three beats (~35 seconds of speaking)</div>
+    <div class="stepper" id="rehearse2">
+      <div class="step-pane">
+        <div class="step-title">Beat 1 — the setup</div>
+        <p>🎤 <strong>Cue: What did the activity ask, and what two gold questions were added?</strong></p>
+        <details class="beat"><summary>Compare with the beat</summary><div class="say">"The activity asked me to grow the evaluation set with two new answer-key entries — one answerable from a text doc, one only from a chart. I added a cost-review question pointing at the finance doc, and 'which quarter had the lowest revenue?' pointing at the revenue chart — a fact that exists only in pixels."</div></details>
+      </div>
+      <div class="step-pane">
+        <div class="step-title">Beat 2 — what moved</div>
+        <p>🎤 <strong>Cue: Did any score move? Which, and by how much?</strong></p>
+        <details class="beat"><summary>Compare with the beat</summary><div class="say">"A and C stayed at a perfect 1.00 — both new questions were hits for them. B went from 0.25 to 0.30, which with ten questions means exactly one new hit: it got the text question and missed the image one."</div></details>
+      </div>
+      <div class="step-pane">
+        <div class="step-title">Beat 3 — the insight (say this one with conviction)</div>
+        <p>🎤 <strong>Cue: Why did B's score rise if B didn't get any better?</strong></p>
+        <details class="beat"><summary>Compare with the beat</summary><div class="say">"Because I changed the mix of questions, not the retriever. Text-shaped gold questions flatter B; pixels-only ones punish it. The takeaway: an eval is only as honest as its gold set — you can make any strategy look good by choosing questions shaped like the ones it can already do."</div></details>
+      </div>
+      <div class="stepper-controls">
+        <button class="ctl" data-act="back">◀ Back</button>
+        <button class="ctl primary" data-act="next">Next ▶</button>
+        <button class="ctl" data-act="reset">↺ Restart</button>
+        <span class="stepper-progress"></span>
+      </div>
+    </div>
+    <div class="visual-caption">Total speaking time for both activities: about 90 seconds — leaving ~3.5 minutes of your 5 for the pipeline walkthrough.</div>
+  </div>
+
+  <div class="keyidea">
+    <span class="tag">Where this sits in your 5 minutes</span>
+    Suggested Loom arc: <strong>①</strong> the $27M answer in Cell 7.2 (~1 min) → <strong>②</strong> the recall@3 table and why B collapses (~1.5 min) → <strong>③</strong> Activity #1 rankings — the gap live (~45s) → <strong>④</strong> Activity #2 — the honest-eval insight (~35s) → <strong>⑤</strong> the video answer with its [00:26–00:37] citation (~1 min). Scroll to each cell as you talk; the outputs are your slides.
+  </div>
+
+  <h2>Here's exactly where this lives in your notebook</h2>
+  <p>Activity #1 is cells 40–42 (the prompt, your queries + rankings, the observations). Activity #2 is cells 72–74 (the prompt, your gold additions + the recall table, the observations). On the Loom, screen-share the notebook and scroll to these — read nothing, point at the outputs and speak the beats.</p>
+
+  <div class="lesson-footer">
+    <p>📖 <strong>Primary source:</strong> your own executed notebook — this is the rare lesson where the highest-trust source is the thing you built. For the eval-honesty idea, the reference is <a href="https://en.wikipedia.org/wiki/Evaluation_measures_(information_retrieval)">IR evaluation measures</a>.</p>
+    <p>🗂 References: <a href="../reference/three-retrieval-strategies.html">three strategies cheat sheet</a> · previous: <a href="0007-anatomy-of-your-first-transcription.html">Lesson 7</a></p>
+    <p>💬 <strong>Stuck or curious?</strong> Do a dry run with me — speak your beats into the chat and I'll tell you which landed and which drifted. That's the tightest feedback loop before recording.</p>
+  </div>
+
+</main>
+</body>
+</html>

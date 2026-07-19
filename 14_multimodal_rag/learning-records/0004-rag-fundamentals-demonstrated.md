@@ -1,0 +1,5 @@
+# Text RAG and multimodal fundamentals demonstrated in homework quiz
+
+During the 2026-07-18 homework quiz Parth answered all four notebook questions with coaching but genuine recall: named captions and CLIP as workarounds unprompted, articulated the modality gap ("text will always sit closer to text"), recalled the RRF formula (initially "1/60+score" — corrected to *rank*, a diagnostic near-miss), and independently reached "the VLM reads the 240, we hand it pixels". Asked two above-ZPD questions unprompted (why not multimodal embedders everywhere; how good is CLIP's "glancing"), showing active model-building, not recitation. On 2026-07-19 Parth stated "i already understand rag" — consistent with the evidence.
+
+**Implications:** ZPD floor is now: text RAG solid; multimodal pipeline concepts understood at the explain-it level. Watch spots: rank-vs-score slipped once (revisit RRF in a spaced check), and "LLM" vs "VLM" terminology. Next frontier candidates: hybrid retrieval (BM25+dense), rerankers, WER computation (still pending Parth's true first sentence), or the capstone — full pipeline on Parth's own longer recording.
