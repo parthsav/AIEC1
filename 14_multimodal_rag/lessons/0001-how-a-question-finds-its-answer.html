@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lesson 1 · How a question finds its answer</title>
+<link rel="stylesheet" href="../assets/course.css">
+<script src="../assets/stepper.js" defer></script>
+<script src="../assets/quiz.js" defer></script>
+</head>
+<body>
+<main class="lesson">
+
+  <p class="kicker">Multimodal RAG · Lesson 1</p>
+  <h1>How a question finds its answer</h1>
+  <p class="lede">Before we teach a computer to find <em>pictures</em>, let's nail how it finds <em>text</em>. Everything in your notebook stands on this one idea.</p>
+  <p class="meta">⏱ about 15 minutes · uses the real ACME files from <code>data/text/</code> · <a href="../reference/text-rag-pipeline.html">cheat sheet for later</a></p>
+
+  <h2>The problem RAG solves</h2>
+  <p>A model like GPT-4o has read the public internet. It has <strong>never</strong> read your files. Ask it about ACME Robotics and it can only guess.</p>
+  <div class="analogy">
+    <span class="tag">Analogy</span>
+    RAG turns a closed-book exam into an <strong>open-book exam</strong>. The model doesn't memorize your documents — it gets to look up the right page just before it answers.
+  </div>
+  <p>RAG stands for <strong>Retrieval-Augmented Generation</strong>: <em>retrieve</em> the right snippets, then <em>generate</em> an answer from them. The hard part is the lookup. How does a computer know which page is "the right page"?</p>
+
+  <h2>The magic trick: a map of meaning</h2>
+  <div class="analogy">
+    <span class="tag">Analogy</span>
+    Imagine a <strong>GPS for sentences</strong>. Every sentence gets map coordinates — and sentences that <em>mean</em> similar things get coordinates that are <em>near</em> each other. To answer a question, you drop the question onto the map and grab whatever is standing closest.
+  </div>
+  <p>That coordinate list is called an <strong>embedding</strong>. It's the only new word you need right now.</p>
+
+  <div class="visual">
+    <div class="visual-label">Interactive · The meaning map of your six ACME documents</div>
+    <svg id="mmap" viewBox="0 0 640 420" role="img" aria-label="Map of documents in meaning space">
+      <defs>
+        <radialGradient id="regionMoney" cx="50%" cy="50%" r="50%">
+          <stop offset="0%" stop-color="#e3edf5" stop-opacity=".9"/><stop offset="100%" stop-color="#e3edf5" stop-opacity="0"/>
+        </radialGradient>
+        <radialGradient id="regionTech" cx="50%" cy="50%" r="50%">
+          <stop offset="0%" stop-color="#f5eeda" stop-opacity=".9"/><stop offset="100%" stop-color="#f5eeda" stop-opacity="0"/>
+        </radialGradient>
+        <radialGradient id="regionPeople" cx="50%" cy="50%" r="50%">
+          <stop offset="0%" stop-color="#e5f1e8" stop-opacity=".9"/><stop offset="100%" stop-color="#e5f1e8" stop-opacity="0"/>
+        </radialGradient>
+      </defs>
+
+      <!-- soft topic regions -->
+      <ellipse cx="465" cy="150" rx="140" ry="105" fill="url(#regionMoney)"/>
+      <ellipse cx="170" cy="200" rx="140" ry="140" fill="url(#regionTech)"/>
+      <ellipse cx="420" cy="320" rx="120" ry="80" fill="url(#regionPeople)"/>
+      <text x="555" y="70" font-size="11" fill="#8ba3b8">money-ish</text>
+      <text x="70" y="80" font-size="11" fill="#b3a26b">tech-ish</text>
+      <text x="500" y="390" font-size="11" fill="#7fa98a">people-ish</text>
+
+      <!-- connection line (hidden until a query lands) -->
+      <line id="mmap-line" x1="0" y1="0" x2="0" y2="0" stroke="#3e7d4e" stroke-width="2" stroke-dasharray="5 4" opacity="0"/>
+
+      <!-- document dots -->
+      <g id="mmap-docs" font-size="12">
+        <g data-doc="finance"><circle cx="490" cy="120" r="9" fill="#2c5e8a"/><text x="490" y="100" text-anchor="middle" fill="#1a1a1a">doc_finance_costs.md</text></g>
+        <g data-doc="board"><circle cx="425" cy="185" r="9" fill="#2c5e8a"/><text x="425" y="212" text-anchor="middle" fill="#1a1a1a">doc_board_notes.md</text></g>
+        <g data-doc="infra"><circle cx="150" cy="145" r="9" fill="#2c5e8a"/><text x="150" y="125" text-anchor="middle" fill="#1a1a1a">doc_infrastructure.md</text></g>
+        <g data-doc="roadmap"><circle cx="175" cy="290" r="9" fill="#2c5e8a"/><text x="175" y="317" text-anchor="middle" fill="#1a1a1a">doc_product_roadmap.md</text></g>
+        <g data-doc="people"><circle cx="430" cy="325" r="9" fill="#2c5e8a"/><text x="430" y="352" text-anchor="middle" fill="#1a1a1a">doc_people_ops.md</text></g>
+        <g data-doc="gtm"><circle cx="290" cy="225" r="9" fill="#2c5e8a"/><text x="290" y="252" text-anchor="middle" fill="#1a1a1a">doc_gtm_strategy.md</text></g>
+      </g>
+
+      <!-- the query star -->
+      <g id="mmap-query" opacity="0" style="transition: transform .8s cubic-bezier(.22,1,.36,1), opacity .3s;">
+        <path d="M0,-13 L3.8,-4 L13,-4 L5.6,2 L8.4,11 L0,5.5 L-8.4,11 L-5.6,2 L-13,-4 L-3.8,-4 Z" fill="#b3542c"/>
+        <text id="mmap-qlabel" x="0" y="-20" text-anchor="middle" font-size="12" font-weight="700" fill="#b3542c"></text>
+      </g>
+    </svg>
+    <div style="display:flex; gap:.5rem; flex-wrap:wrap; margin-top:.8rem;">
+      <button class="ctl" data-q="0">“What caused the March churn spike?”</button>
+      <button class="ctl" data-q="1">“How much goes to compute vs storage?”</button>
+      <button class="ctl" data-q="2">“Which team grew the most this year?”</button>
+    </div>
+    <div class="visual-caption" id="mmap-caption">
+      <strong>Click a question</strong> to drop it onto the map. Watch where it lands — and which document lights up as its nearest neighbor.
+    </div>
+  </div>
+
+  <div class="keyidea">
+    <span class="tag">Key idea</span>
+    An embedding is just a <strong>list of numbers</strong> — 1,536 of them for <code>text-embedding-3-small</code>, the model in your notebook. This map squashes those 1,536 dimensions down to 2 so we can see them. Nearby lists = similar meaning. <strong>That is the entire trick underneath all of RAG.</strong>
+  </div>
+  <p>Look at question 2 again: <em>“How much goes to compute vs storage?”</em> shares almost no words with <code>doc_finance_costs.md</code> — no “cloud”, no “cost”. A keyword search would miss it. The meaning map still puts them side by side, because they're <em>about the same thing</em>.</p>
+
+  <h2>The whole pipeline, one document at a time</h2>
+  <p>Text RAG is five steps. Step through them below and watch one real ACME document — <code>doc_board_notes.md</code> — travel the entire journey.</p>
+
+  <div class="visual">
+    <div class="visual-label">Step-through · One document's journey from file to answer</div>
+    <div class="stepper" id="pipeline">
+
+      <div class="step-pane">
+        <div class="step-title">① CHUNK — cut documents into bite-sized pieces</div>
+        <div style="border:1px solid var(--line); border-radius:8px; overflow:hidden;">
+          <div style="font-family:var(--sans); font-size:.75rem; font-weight:700; background:var(--code-bg); padding:.4rem .8rem;">📄 data/text/doc_board_notes.md</div>
+          <div style="padding:.8rem; font-size:.88rem; line-height:1.6;">
+            Revenue was strongest in the final quarter, driven by a large public-sector deal.
+            <span style="background:#fff3c4; border-radius:3px;">Churn improved materially after the onboarding revamp, but <strong>spiked in March</strong> due to a <strong>billing bug</strong> that double-charged a cohort of customers…</span>
+          </div>
+        </div>
+        <p class="step-note">Like copying a book onto <strong>index cards</strong> — one card, one idea. Your ACME documents are already tiny, so the notebook keeps each file whole: one file = one chunk (Cell 3.2 loads them).</p>
+      </div>
+
+      <div class="step-pane">
+        <div class="step-title">② EMBED — turn each chunk into map coordinates</div>
+        <div style="display:flex; align-items:center; gap:.7rem; flex-wrap:wrap; font-family:var(--sans); font-size:.8rem;">
+          <div style="border:1px solid var(--line); border-radius:8px; padding:.6rem .8rem; max-width:170px;">“…churn spiked in March due to a billing bug…”</div>
+          <div style="color:var(--accent); font-size:1.3rem;">→</div>
+          <div style="border:1.5px solid var(--blue); border-radius:8px; padding:.6rem .8rem; background:var(--blue-soft); font-weight:600;">embedding model<br><span style="font-weight:400; font-size:.72rem;">text-embedding-3-small</span></div>
+          <div style="color:var(--accent); font-size:1.3rem;">→</div>
+          <div style="border:1px solid var(--line); border-radius:8px; padding:.6rem .8rem; font-family:var(--mono); font-size:.72rem;">[0.021, −0.043, 0.118,<br>&nbsp;0.007, −0.096, 0.054,<br>&nbsp;… 1,530 more numbers]</div>
+        </div>
+        <p class="step-note">The chunk goes in; <strong>1,536 numbers</strong> come out — its coordinates on the meaning map. Same text in, same numbers out, every time.</p>
+      </div>
+
+      <div class="step-pane">
+        <div class="step-title">③ STORE — file the coordinates in a vector database</div>
+        <div style="border:1.5px solid var(--blue); border-radius:8px; overflow:hidden; font-family:var(--sans); font-size:.78rem;">
+          <div style="background:var(--blue); color:#fff; padding:.4rem .8rem; font-weight:700;">🗄 Qdrant collection “strategy_a” (running in memory)</div>
+          <table style="width:100%; border-collapse:collapse;">
+            <tr style="background:var(--blue-soft);"><th style="text-align:left; padding:.35rem .8rem;">id</th><th style="text-align:left; padding:.35rem .8rem;">vector</th><th style="text-align:left; padding:.35rem .8rem;">original text</th></tr>
+            <tr><td style="padding:.35rem .8rem; border-top:1px solid var(--line);">doc_board_notes.md</td><td style="padding:.35rem .8rem; border-top:1px solid var(--line); font-family:var(--mono);">[0.021, −0.043, …]</td><td style="padding:.35rem .8rem; border-top:1px solid var(--line);">“Revenue was strongest…”</td></tr>
+            <tr><td style="padding:.35rem .8rem; border-top:1px solid var(--line);">doc_finance_costs.md</td><td style="padding:.35rem .8rem; border-top:1px solid var(--line); font-family:var(--mono);">[0.088, 0.012, …]</td><td style="padding:.35rem .8rem; border-top:1px solid var(--line);">“Cloud spend is…”</td></tr>
+            <tr><td style="padding:.35rem .8rem; border-top:1px solid var(--line);">…4 more rows</td><td style="padding:.35rem .8rem; border-top:1px solid var(--line);"></td><td style="padding:.35rem .8rem; border-top:1px solid var(--line);"></td></tr>
+          </table>
+        </div>
+        <p class="step-note">A <strong>vector database</strong> is a filing cabinet sorted by <em>meaning</em> instead of alphabet. Yours is called <strong>Qdrant</strong>; the notebook runs it inside the notebook process — no server needed.</p>
+      </div>
+
+      <div class="step-pane">
+        <div class="step-title">④ RETRIEVE — drop the question on the map, grab the 3 nearest</div>
+        <div style="font-family:var(--sans); font-size:.82rem;">
+          <div style="border:1.5px solid var(--accent); border-radius:8px; padding:.5rem .8rem; margin-bottom:.6rem; background:var(--accent-soft);">❓ “What caused the March churn spike?” <span style="color:var(--ink-soft)">→ embedded with the <em>same</em> model → its own coordinates</span></div>
+          <div style="border:1px solid var(--line); border-radius:8px; padding:.6rem .8rem;">
+            <div style="font-weight:700; margin-bottom:.3rem;">Nearest neighbors (k = 3):</div>
+            <div style="padding:.25rem 0; color:var(--green); font-weight:700;">1. doc_board_notes.md&nbsp; ← “billing bug… double-charged” ✓</div>
+            <div style="padding:.25rem 0;">2. doc_product_roadmap.md</div>
+            <div style="padding:.25rem 0;">3. doc_finance_costs.md</div>
+          </div>
+        </div>
+        <p class="step-note">This is exactly what the meaning map above animated. <code>k=3</code> just means “bring back the 3 closest chunks”.</p>
+      </div>
+
+      <div class="step-pane">
+        <div class="step-title">⑤ ANSWER — paste the found chunks into the model's prompt</div>
+        <div style="border:1px solid var(--line); border-radius:8px; padding:.7rem .9rem; font-family:var(--mono); font-size:.72rem; line-height:1.7; background:var(--code-bg);">
+          Question: What caused the March churn spike?<br>
+          --- CONTEXT ---<br>
+          [doc_board_notes.md]: …spiked in March due to a billing bug…<br>
+          [doc_product_roadmap.md]: …onboarding revamp shipped…<br>
+          --- END CONTEXT --- Answer with citations.
+        </div>
+        <div style="display:flex; align-items:center; gap:.7rem; margin-top:.6rem; font-family:var(--sans); font-size:.85rem;">
+          <div style="font-size:1.3rem; color:var(--accent);">↓</div>
+          <div style="border:1.5px solid var(--green); background:var(--green-soft); border-radius:8px; padding:.6rem .9rem;">💬 “The March churn spike was caused by a <strong>billing bug that double-charged a cohort of customers</strong> [doc_board_notes.md].”</div>
+        </div>
+        <p class="step-note">The open-book exam, delivered: the model answers <em>from the pages we handed it</em> and cites which page. That's “generation”, grounded.</p>
+      </div>
+
+      <div class="stepper-controls">
+        <button class="ctl" data-act="back">◀ Back</button>
+        <button class="ctl primary" data-act="next">Next ▶</button>
+        <button class="ctl" data-act="reset">↺ Restart</button>
+        <span class="stepper-progress"></span>
+      </div>
+    </div>
+    <div class="visual-caption">The five steps of text RAG: <strong>chunk → embed → store → retrieve → answer</strong>. Steps ①–③ happen once, up front (“ingestion”). Steps ④–⑤ happen every time you ask (“query time”).</div>
+  </div>
+
+  <h2>Here's exactly where this lives in your notebook</h2>
+  <p>Open <code>multimodal_rag.ipynb</code>, Section 5, “Strategy A” (Cell 5.1). All five steps hide inside seven lines:</p>
+  <div class="visual">
+    <div class="visual-label">Code spotlight · multimodal_rag.ipynb — Section 5, Cell 5.1</div>
+    <pre class="code"><span class="cm"># steps ② EMBED and ③ STORE happen inside this one call:</span>
+store_A = <span class="hl">QdrantVectorStore.from_documents</span>(docs_A, text_embedder,
+              location=":memory:", collection_name="strategy_a")
+
+<span class="cm"># step ④ RETRIEVE — embeds your query, returns the k nearest chunks:</span>
+def retrieve_A(query, k=3):
+    return <span class="hl">store_A.similarity_search(query, k=k)</span></pre>
+    <div class="visual-caption">Step ① (chunking) is Cell 3.2, which loads each file as one chunk. Step ⑤ (answering) is Section 7's <code>answer()</code> function — it pastes retrieved chunks into the prompt exactly like the step-through showed.</div>
+  </div>
+
+  <h2>Prove it to yourself</h2>
+  <p>No peeking back up the page — that's the point. Effortful recall is what makes it stick.</p>
+
+  <div class="quiz-q">
+    <p class="qtext">1. In your own words: what is an embedding?</p>
+    <button class="quiz-opt" data-good="1" data-why="Coordinates on the meaning map — 1,536 numbers whose neighbors mean similar things.">A list of numbers acting as coordinates for meaning</button>
+    <button class="quiz-opt" data-why="Nothing is compressed or copied — the original text is stored separately, alongside the numbers.">A compressed copy of the document saved for later</button>
+    <button class="quiz-opt" data-why="No keywords involved — that's old-school search. Embeddings capture meaning, not exact words.">A keyword index the database scans during each search</button>
+    <div class="quiz-feedback"></div>
+  </div>
+
+  <div class="quiz-q">
+    <p class="qtext">2. “How much goes to compute vs storage?” shares almost no words with <code>doc_finance_costs.md</code> — yet retrieval finds it. Why?</p>
+    <button class="quiz-opt" data-good="1" data-why="Both are 'about cloud money', so the embedding model gives them nearby coordinates. Meaning beats keywords.">Both land at nearby points on the meaning map</button>
+    <button class="quiz-opt" data-why="No synonym lists exist anywhere in this pipeline — only coordinates and distances between them.">The database stores synonyms for every word it sees</button>
+    <button class="quiz-opt" data-why="The question is never rewritten — it's embedded once, as-is, and dropped onto the map.">The model rewrites the question until its keywords match</button>
+    <div class="quiz-feedback"></div>
+  </div>
+
+  <div class="quiz-q">
+    <p class="qtext">3. At answer time (step ⑤), what does the language model actually receive?</p>
+    <button class="quiz-opt" data-good="1" data-why="The vectors' only job was finding the chunks. The model reads plain text, pasted into its prompt.">The question plus the retrieved chunks pasted as text</button>
+    <button class="quiz-opt" data-why="Sending everything would defeat retrieval entirely — the whole point is selecting only the nearest few.">The question plus every document stored in the database</button>
+    <button class="quiz-opt" data-why="Close — but vectors are for searching, not reading. The model gets the original text back instead.">The question plus the vectors from the nearest chunks</button>
+    <div class="quiz-feedback"></div>
+  </div>
+
+  <h2>The crack in the wall</h2>
+  <p>Now look at this file from your <code>data/images/</code> folder:</p>
+  <div class="visual">
+    <div class="visual-label">The problem lesson 2 will solve · fig_revenue_quarterly.png</div>
+    <img alt="ACME quarterly revenue bar chart — Q4 is highest at $27M" src="data:image/png;base64,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dqKjox1ebC9cuGC0atUqy/36+PgYY8eOzfT+ZnZJk10w+/bbb02Bw9nls88+s7efMGFCtvu+/fbbr/NR9Kw333zTVG+FChUybfvPP//Ye2nSLr/99pt9/c0G34wB3NklLi7OuHTpkmm7jOHkwQcfNPz8/ByeYzk5VtLX9Morr2RZk4+Pj9MxsBmf3x07dsz0mEy/LH2Pb8YP9xl72M6ePWvkyZPHvr5ly5aZPm7Z1Zfx9SfjWO/Zs2c73MaqVauMwoULZ/m/bN++vemxevHFF03rV61aZbrNK1eumJ5/VatWNa135+MhXfsm8fvvvzdte7PB98SJE0ajRo2y/D/ddtttTseJ3qhBgwaZbn/o0KH2dbt37zati4iIcNg+4/8np+9PkydPNm3XoUMHp+369etnb7NgwQKH/+GNBN+M7z9Tp0512i5v3rz2NsOHDzcMw3B47u3evdvp9hlf39K/nlWqVMnernv37vblY8aMMW2TWfBdvny5qZ2zD2GexqwOXvTRRx/Zxw5JUocOHZQ/f341a9bMvuynn35y+CVpamqqNm3aZFqWfpsb4ePjo969e9uvv/vuu5Kkd955x76sT58+TscVZeWdd97RAw884HAZPHjwTdWbXkpKij799FPTsnbt2pmuX7x4Uc2bN1dSUpJ9WVhYmJo0aaJy5crZl50+fVoJCQmmMaEZffXVV0pKSlKNGjXUqFEjBQUF2dft3LnT9H+UpJ49e+rLL7+0X8+TJ49iY2MVExMjm80m6dr469GjR2vGjBmSpMqVK6t9+/YO46ObN2+u9u3b2y85sXPnTrVs2VKHDx+2LwsODladOnXUsmVLlSlTxtQ+JSVFEydOtF8PDAxUbGysWrZsqRo1aqhQoUI52q+3/fTTT6br9erVy7RtiRIlHP7XGbe/WQULFlRMTIyaNGmiNm3aqH79+goODravX7VqlSZPnpzlbXzyySe6cuWKKlSooBYtWqhixYo6f/682rdv7zBeMSYmxnSspI2p//DDDzV48GClpqZKunY83nPPPWratKny5csn6drxOGTIEC1evDjLeubPn6+goCDVrVtXTZo0UcGCBbP9PzzxxBOm58x7771nWv/FF1/o33//tV/v2bNntreZEwcOHNB3331nv54nTx6H183t27erTZs2On78uKRr48Fr166t+Ph4RUZG2tstXrxYzzzz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uis9VwRfwzA/rx944AGnbTJ+gM7sEhERYSQnJ2d5310ZfNOfdCQ8PDxXnLmNoQ4elnE2h6ymZfL39zcNjk9NTTX9UEK6Ng5t06ZNWr58ubp3767KlSurQIEC8vX1Vb58+VS9enX16dNHK1eudPlXh7nN/fffbxqHdfr0adMYvAoVKujXX3/V22+/rcaNGyssLEx+fn7Kly+f7rzzTg0bNkx//vmnWrduneV+SpYsqZ9++kn9+vVTyZIl5e/vr4iICPXv318bN250+AoxJCREy5Yt02effaZ27dopIiJCAQEBypMnj6Kjo9WtWzdt3rzZ4et1SYqIiNCqVavUrFkzFSxY8IbH/DZu3Fh//vmnXnrpJTVs2FCFCxeWn5+fChQooKpVq6pv376qXr26vf2cOXM0cOBA1atXT5GRkQoODpafn5/CwsLUsGFDTZo0SevXrzeNicytwsLC9PXXX+v7779Xr169VKVKFRUoUMDhfzl79myNHz8+0yEun332mQYNGmR6zHv16qWtW7dmOdNEvXr19P3336tp06YKDQ1Vnjx5VL16db333nuaMmWKS+9r2li+4sWLZ/nDpmHDhum3335T//79Va1aNYWGhtpfM6pWraquXbvqww8/1BdffOHS+pzp06ePaUq2e++91+mPl1xlyJAhpq96v/32W9Ok+k2bNlVSUpLGjx+vu+++W4UKFZKvr6+Cg4NVrlw5tWvXTm+99ZZ95paMgoODHaZUDAsLy/J1xVuPx7PPPqv33ntPVapUUUBAgAoWLKhWrVppw4YN9imwMlOoUCGtWbNGCxcuVLt27RQZGanAwED5+/urWLFiatCggYYOHap169Y5DJFyp2rVqikpKUmjR49W9erVFRoaqqCgIJUtW1a9evXS77//7nTKy9ws/e9uli5dapolJM3+/fv19ttvq2nTpvb3mDR58uRR5cqVNXDgQP38888OM2K4y9WrV/Xxxx/br/fo0eO6hlm4i80wXDABLADcYlJSUnTffffZf+BUrFgxrVu3zq2hC4527typihUr2sf3fvLJJy6fEgq4lV24cEFRUVH2cdTTpk3L0VR/NptNsbGxXjtb2urVqxUXFyfp2nzju3fv9ljozgo9vgAsKSAgQJ9++qn9lNWHDx9Ws2bNdOzYMS9X9t+3f/9+vfrqqxo1apSaNWtmD71ly5Z1ON04YHXB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49XRFgAAALAItwbfMWPGuPPmAQAAgByjuxUAAACW4NYeX+naWN5Vq1Zp586dOn78uAzDMK232WwaOXKku8sAAACAxbk1+O7cuVNt27ZVUlKSQ+BNQ/AFAACAJ7h1qEP//v21e/duvfTSS9qyZYv27t3rcNmzZ487S0AulJycrAEDBqhevXoKDg6WzWZTYmKiqc3Bgwf17LPPqnbt2ipYsKAKFSqk+vXr64svvvBS1QAA4Fbn1uD7/fff66mnntKgQYNUo0YNlSpVyukF1rJr1y4tWLBABQoUUGxsrNM2P/30k+bPn6/mzZvr448/1vz58xUVFaW2bdsyBR4AALghbh3qEBgYqNKlS7tzF7gFNWzYUIcPH5YkzZo1S8uXL3doU79+fe3cuVP+/v72Zc2aNdOBAwc0YcIEDRgwwGP1AgCA/wa39vg2bdpUP/74ozt3gVtQTuZuLlCggCn0pomJidGRI0d0+fJld5QGAAD+w9wafF977TWtX79ekyZNUkpKijt3BYtYu3atoqOjnYZiAACArLh1qMPdd9+t8+fPa8iQIRo2bJhKlCghX19fUxubzabdu3e7swz8R7zzzjvavHmzZs+e7e1SAADALcitwbdkyZIOpywGbsTy5cv19NNPq3PnzurcubO3ywEAALcgtwbftWvXuvPmYRHffvut7r//frVo0ULTp0/3djkAAOAWxSmLkautW7dOLVu2VIMGDbRgwQL5+bn9ZIMAAOA/yiPB97vvvtOIESP0+OOPKykpSZJ07tw5fffddzp16pQnSsAtaMuWLWrRooVq1Kihzz77TIGBgd4uCQAA3MLc2n2Wmpqqjh07atGiRTIMQzabTQ8//LAqVqwoPz8/tW3bVoMGDdKzzz7rzjKQCy1atEjStXArSStXrlRSUpJCQkLUvHlzbd++XU2bNlVwcLBGjBih3377zbT9nXfeSRAGAADXxa3B96WXXtLixYv12muvqVmzZqpUqZJ9XVBQkNq1a6evvvqK4GtBCQkJpusDBw6UJJUqVUr79u3T+vXrdeLECUlSkyZNHLbfu3evoqKi3F4nAAD473DrUIc5c+aoc+fOevLJJxUWFuawvlKlSkxlZlGGYTi97Nu3T5LUtWvXTNsYhkHoBQAA182twXffvn2qW7dupusLFCigkydPurMEAAAAQJKbg29oaKj962pndu3apSJF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oaGhCg4OVuXKlTVkyBAdOXLE6TZTp07VI488oooVK8rX11c2m83DVSO3uN7j559//tELL7yg2NhYFS9eXCEhIbr99ts1ePBgHT9+3Av3AN50vcfPkSNH9Nhjj6latWoqVKiQgoKCVK5cOXXv3l27du3ywj2AN93I+1d6V69eVd26dWWz2dSyZUsPVAxnmM4MHrNjxw41bdpUf/31l+6//341btxY/v7+2rBhg+bNm6f8+fNr6dKluuuuu0zbRUVF6fjx47rzzju1d+9eJScni8PWem7k+JkyZYqefPJJxcfHq379+goNDdWmTZs0a9YshYeHa/PmzQoPD/fivYKn3Mjxs337dnXr1k1169ZVqVKllCdPHu3cuVMzZszQpUuXtGHDBlWuXNmL9wqecqPvX+lNnjxZw4cP17lz5xQfH6+lS5d68B7AzgA84Pz580b58uUNf39/Y+nSpQ7rN2/ebOTPn98oWrSocfjwYdO6vXv3GqmpqYZhGEZ8fLzBYWs9N3r8JCYmGgcPHnRo/8EHHxiSjGeeecatdSN3uJnXH2c2bdpkSDL69OnjjnKRy7ji+Nm/f78RGhpqTJo0yZBkxMfHu7tsZIKhDvCI6dOna8eOHXrqqacUHx/vsD4mJkYTJ07UkSNH9Morr5jWRUVFcWY9i7vR4+f222932qPboUMHSVJiYqL7ikaucTOvP86UKlVKknTy5EmX14rcxxXHT9++fVWmTBk9+eST7i4X2SBNwCMWLVokSerZs2embbp27Sp/f38tXrzYU2XhFuHq4yc5OVmSVKxYMdcUiFztZo+fy5cv69ixYzp48KC+//57Pfzww5KkFi1auKdg5Co3e/wsWrRIX375paZMmSJfX1+31YmcIfjCIxITExUaGqpy5cpl2iY4OFgVK1bU3r17de7cOQ9Wh9zO1cfP6NGjJUldunRxaZ3InW72+FmxYoWKFCmiEiVKqGHDhvr99981adIkderUyd2lIxe4mePn9OnTGjBggHr16qU6dep4olxkg+ALjzhz5ozy58+fbbt8+fJJks6ePevuknALceXxM2nSJC1cuFA9e/bUPffc47IakXvd7PFTp04drVy5UkuWLNGLL76o4sWL6+TJk7py5Ypb6kXucjPHz5AhQ3T16lW98MILbqsP18fP2wXAGvLly6czZ85k2+7MmTPy8fFRWFiYB6rCrcJVx8+0adM0ePBgxcfHa/Lkya4uE7nUzR4/YWFhiouLkyS1atVKnTp1UrVq1XTkyBFNnTrVLTUj97jR4+f777/XBx98oLlz56pAgQJurhI5RY8vPKJKlSo6c+ZMlnNfXrhwQUlJSSpVqpT8/f09WB1yO1ccPzNmzFDPnj3VpEkTLV68mGPMQlz9+lOiRAnFxcVp+vTpunTpkqvLRS5zo8dPv379dMcdd+iuu+7Srl277Je09rt27dKxY8c8ch/wfwi+8IgHHnhA0rUet8zMmTNHly9f1qOPPuqpsnCLuNnjZ8aMGerRo4fi4uL0+eefKzAw0G21Ivdxx+vPv//+q9TU1Bz1BOLWdqPHz19//aVff/1V0dHRposkrVmzRtHR0RozZoxba4cjTmABj7hw4YL9BBRLlixRs2bNTOt//vln3XvvvcqTJ49++eWXTH9t37JlSy1btowTWFjMzRw/s2bNUvfu3dW4cWN9+eWXypMnj6fLh5fd6PFz+PBhp69Ff/zxh2rXrq3w8HDO4GYBN3r8LFmyRCkpKQ63l5CQoJo1a2rYsGEqV66cqlev7om7gf+P4AuP2b59u5o1a6a///5b7du3V6NGjeTn56dNmzZp7ty5KliwoJYuXaqYmBjTdl9++aW2bt0qSZo3b562b9+u559/XpJUoEAB9evXz+P3BZ53I8fPkiVL1K5dO+XLl08vv/yyQ+jNmzev2rZt6+F7Am+4kePnqaee0sqVKxUfH6+oqCgZhqHExETNnTtXly9f1pIlS9S0aVMv3it4yo2+fzljs9k4c5s3efPsGbCe06dPG+PGjTOqV69uhISEGJIMScbtt99unDx50uk2Xbp0sbfLeClVqpRH64d3Xe/xM3r06EyPHY4f67ne42flypVG+/btjVKlShl58uQxAgICjNKlSxtdu3Y1EhMTPX8H4FU38v7ljDhzm1fR4wuvunLlihISEvT555/rtdde09NPP+3tknAL4fjBzeD4wc3g+Lk1EXzhdSkpKWrXrp2++uorvfvuu+rTp4+3S8IthOMHN4PjBzeD4+fWQ/AFAACAJTCdGQAAACyB4AsAAABLIPgCAADAEgi+AAAAsASCLwAAACyB4AsAAABLIPgCAADAEgi+AAAAsASCLwAAACyB4AsAAABLIPgCAADAEgi+AAAAsASCLwAAACyB4AsAAABLIPgCAADAEgi+AAAAsASCLwAAACyB4AsAAABLIPgCAADAEgi+AAAAsASCLwAAACzh/wEZ6z8ULcEYgwAAAABJRU5ErkJggg==">
+    <div class="visual-caption">The number <strong>$27M appears in no text file anywhere in the corpus</strong>. It exists only as pixels inside this picture.</div>
+  </div>
+  <p>Everything you just learned runs on <em>text</em>. An embedding model reads words — hand it a PNG and it's blind. To the pipeline above, this chart is <strong>invisible</strong>: it can never be found, and its $27M can never be cited.</p>
+  <div class="callout-next">
+    <strong>Next lesson:</strong> <a href="0002-teaching-the-pipeline-to-see.html">how a model that can <em>see</em> (a Vision-Language Model) smuggles pictures into the meaning map</a> — the two very different jobs it does in your notebook, and why the whole session exists.
+  </div>
+
+  <div class="lesson-footer">
+    <p>📖 <strong>Primary source</strong> (30 min, genuinely worth it): <a href="https://simonwillison.net/2023/Oct/23/embeddings/">Simon Willison — “Embeddings: What they are and why they matter”</a>. The meaning-map idea, from the person who explains it best. There's a talk-video version on the same page if you prefer watching.</p>
+    <p>🗂 Keep the <a href="../reference/text-rag-pipeline.html">one-page pipeline cheat sheet</a> handy while running notebook Sections 0–5.</p>
+    <p>💬 <strong>Stuck or curious?</strong> Ask me — your teacher — anything in the Claude Code session: “why 1,536 numbers?”, “what does cosine distance mean?”, “show me step ② with a different document”. Follow-up questions are the fastest way to learn.</p>
+  </div>
+
+</main>
+
+<script>
+// Meaning map interaction (lesson-specific, so it lives here — reusable widgets live in ../assets/)
+document.addEventListener("DOMContentLoaded", () => {
+  const queries = [
+    { label: "churn spike?", x: 408, y: 165, doc: "board",   caption: "It landed beside <strong>doc_board_notes.md</strong> — the file that mentions the billing bug. “Churn spike” and “billing bug double-charged customers” mean similar things, so they sit close together." },
+    { label: "compute vs storage?", x: 505, y: 145, doc: "finance", caption: "It landed beside <strong>doc_finance_costs.md</strong> — even though the question never says “cloud” or “cost”. Shared <em>meaning</em>, not shared words, is what makes them neighbors." },
+    { label: "team growth?", x: 452, y: 300, doc: "people",  caption: "It landed beside <strong>doc_people_ops.md</strong> — the hiring document. “Team grew” and “headcount increased” are neighbors on the meaning map." },
+  ];
+  const star = document.getElementById("mmap-query");
+  const qlabel = document.getElementById("mmap-qlabel");
+  const line = document.getElementById("mmap-line");
+  const caption = document.getElementById("mmap-caption");
+  const docs = {};
+  document.querySelectorAll("#mmap-docs [data-doc]").forEach(g => {
+    const c = g.querySelector("circle");
+    docs[g.dataset.doc] = { g, c, x: +c.getAttribute("cx"), y: +c.getAttribute("cy") };
+  });
+  document.querySelectorAll("[data-q]").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const q = queries[+btn.dataset.q];
+      // reset highlights
+      Object.values(docs).forEach(d => { d.c.setAttribute("fill", "#2c5e8a"); d.c.setAttribute("r", "9"); });
+      line.setAttribute("opacity", "0");
+      // move the star
+      star.setAttribute("opacity", "1");
+      star.style.transform = `translate(${q.x}px, ${q.y}px)`;
+      qlabel.textContent = q.label;
+      // after it arrives: draw the line, light up the nearest doc
+      setTimeout(() => {
+        const d = docs[q.doc];
+        line.setAttribute("x1", q.x); line.setAttribute("y1", q.y);
+        line.setAttribute("x2", d.x); line.setAttribute("y2", d.y);
+        line.setAttribute("opacity", "1");
+        d.c.setAttribute("fill", "#3e7d4e"); d.c.setAttribute("r", "12");
+        caption.innerHTML = q.caption + " <em>(Try the other questions too.)</em>";
+      }, 850);
+    });
+  });
+});
+</script>
+</body>
+</html>

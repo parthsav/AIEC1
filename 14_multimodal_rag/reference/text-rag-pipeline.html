@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cheat sheet · The text RAG pipeline</title>
+<link rel="stylesheet" href="../assets/course.css">
+<style>
+  /* compact, print-friendly reference layout */
+  .lesson { max-width: 52rem; }
+  .pipe { display: flex; gap: .4rem; align-items: stretch; flex-wrap: wrap; margin: 1.2rem 0; }
+  .pipe .stage {
+    flex: 1 1 130px; border: 1.5px solid var(--blue); border-radius: 10px;
+    padding: .7rem .8rem; font-family: var(--sans); background: var(--card);
+  }
+  .pipe .stage h4 { font-size: .8rem; color: var(--blue); margin-bottom: .3rem; }
+  .pipe .stage p { font-size: .74rem; color: var(--ink-soft); margin: 0; line-height: 1.45; }
+  .pipe .arrow { align-self: center; color: var(--accent); font-size: 1.1rem; }
+  table.ref { width: 100%; border-collapse: collapse; font-family: var(--sans); font-size: .82rem; margin: 1rem 0; }
+  table.ref th { text-align: left; padding: .5rem .7rem; background: var(--code-bg); }
+  table.ref td { padding: .5rem .7rem; border-top: 1px solid var(--line); vertical-align: top; }
+  dl.gloss dt { font-weight: 700; margin-top: .9rem; }
+  dl.gloss dd { margin-left: 0; color: var(--ink-soft); font-size: .95rem; }
+  @media print { .visual { box-shadow: none; } body { background: #fff; } }
+</style>
+</head>
+<body>
+<main class="lesson">
+
+  <p class="kicker">Reference · keep this open while running the notebook</p>
+  <h1>The text RAG pipeline</h1>
+  <p class="lede">One page. The five steps, the words that matter, and where each step lives in <code>multimodal_rag.ipynb</code>.</p>
+
+  <h2>The five steps</h2>
+  <div class="pipe">
+    <div class="stage"><h4>① CHUNK</h4><p>Cut documents into bite-sized pieces (index cards). One idea per card.</p></div>
+    <div class="arrow">→</div>
+    <div class="stage"><h4>② EMBED</h4><p>Each chunk → 1,536 numbers: its coordinates on the meaning map.</p></div>
+    <div class="arrow">→</div>
+    <div class="stage"><h4>③ STORE</h4><p>Coordinates + original text filed in Qdrant, the vector database.</p></div>
+    <div class="arrow">→</div>
+    <div class="stage"><h4>④ RETRIEVE</h4><p>Embed the question with the same model; grab the k nearest chunks.</p></div>
+    <div class="arrow">→</div>
+    <div class="stage"><h4>⑤ ANSWER</h4><p>Paste question + chunks into the prompt; the model answers and cites.</p></div>
+  </div>
+  <p style="font-family:var(--sans); font-size:.85rem; color:var(--ink-soft);">①–③ run once, up front (<strong>ingestion</strong>). ④–⑤ run on every question (<strong>query time</strong>).</p>
+
+  <h2>Where each step lives in your notebook</h2>
+  <table class="ref">
+    <tr><th>Step</th><th>Notebook location</th><th>The line that does it</th></tr>
+    <tr><td>① Chunk</td><td>Section 3, Cell 3.2</td><td><code>raw_records.append(RawRecord(...))</code> — one file = one chunk</td></tr>
+    <tr><td>② Embed + ③ Store</td><td>Section 5, Cell 5.1</td><td><code>QdrantVectorStore.from_documents(docs_A, text_embedder, location=":memory:")</code></td></tr>
+    <tr><td>④ Retrieve</td><td>Section 5, Cell 5.1</td><td><code>store_A.similarity_search(query, k=3)</code></td></tr>
+    <tr><td>⑤ Answer</td><td>Section 7, Cell 7.1</td><td><code>answer(query)</code> — builds the prompt, calls the model</td></tr>
+  </table>
+
+  <h2>Words that matter</h2>
+  <dl class="gloss">
+    <dt>RAG (Retrieval-Augmented Generation)</dt>
+    <dd>The open-book exam: look up the right snippets first, then answer only from them.</dd>
+    <dt>Embedding</dt>
+    <dd>A list of numbers acting as coordinates for meaning. Similar meaning → nearby coordinates.</dd>
+    <dt>Vector</dt>
+    <dd>Just another name for that list of numbers. “Vector” and “embedding” are used interchangeably.</dd>
+    <dt>Vector database (Qdrant)</dt>
+    <dd>A filing cabinet sorted by meaning: stores vectors + original text, finds nearest neighbors fast.</dd>
+    <dt>Chunk</dt>
+    <dd>One index card: a bite-sized piece of a document, the unit that gets embedded and retrieved.</dd>
+    <dt>k (as in k = 3)</dt>
+    <dd>How many nearest chunks retrieval brings back.</dd>
+    <dt>Grounding</dt>
+    <dd>Forcing the model to answer only from the provided context, with citations — no guessing.</dd>
+    <dt>Ingestion vs query time</dt>
+    <dd>Ingestion = the once-up-front work (①–③). Query time = the per-question work (④–⑤).</dd>
+  </dl>
+
+  <h2>The one limitation to remember</h2>
+  <div class="keyidea">
+    <span class="tag">Why this session exists</span>
+    Text embedding models are <strong>blind to images</strong>. A chart's numbers (ACME's “$27M”) live only in pixels, so this pipeline can never find or cite them. Fixing that is the whole point of multimodal RAG.
+  </div>
+
+  <div class="lesson-footer">
+    <p>From <a href="../lessons/0001-how-a-question-finds-its-answer.html">Lesson 1 — How a question finds its answer</a> · Primary source: <a href="https://simonwillison.net/2023/Oct/23/embeddings/">Simon Willison on embeddings</a></p>
+  </div>
+
+</main>
+</body>
+</html>

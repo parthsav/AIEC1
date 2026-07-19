@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lesson 7 · Anatomy of your first transcription run</title>
+<link rel="stylesheet" href="../assets/course.css">
+<script src="../assets/quiz.js" defer></script>
+<style>
+  .filetable { width: 100%; border-collapse: collapse; font-family: var(--sans); font-size: .8rem; }
+  .filetable th { text-align: left; padding: .45rem .7rem; background: var(--code-bg); }
+  .filetable td { padding: .45rem .7rem; border-top: 1px solid var(--line); vertical-align: top; }
+  .cmp { display: flex; gap: .8rem; flex-wrap: wrap; font-family: var(--sans); font-size: .8rem; }
+  .cmp .col { flex: 1 1 250px; border-radius: 10px; overflow: hidden; border: 1.5px solid var(--line); }
+  .cmp .col h4 { color: #fff; padding: .45rem .8rem; font-size: .82rem; }
+  .cmp .col .body { padding: .6rem .8rem; line-height: 1.9; }
+  .miss { background: #f7e6e3; border-radius: 3px; padding: 1px 4px; }
+  .better { background: var(--green-soft); border-radius: 3px; padding: 1px 4px; }
+</style>
+</head>
+<body>
+<main class="lesson">
+
+  <p class="kicker">Multimodal RAG · Lesson 7</p>
+  <h1>Anatomy of your first transcription run</h1>
+  <p class="lede">You just ran Whisper on your own voice. This lesson replays exactly what happened, shows where every file landed, and answers your sharp observation: <em>"the transcription is not totally accurate."</em> Correct — and now we can say precisely why.</p>
+  <p class="meta">⏱ about 12 minutes · your artifacts live in <code>experiments/</code> · previous: <a href="0006-where-the-transcript-comes-from.html">Lesson 6</a></p>
+
+  <h2>What actually happened, command by command</h2>
+  <div class="visual">
+    <div class="visual-label">Your run, replayed · every box is a real file or real output from it</div>
+    <svg viewBox="0 0 640 330" role="img" aria-label="The four stages of the transcription run">
+      <defs><marker id="arr" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 z" fill="#b3542c"/></marker></defs>
+      <rect x="20" y="20" width="280" height="58" rx="9" fill="#fdf0e7" stroke="#b3542c" stroke-width="1.8"/>
+      <text x="34" y="44" font-size="12.5" font-weight="700">🎙 39-60 54th St, Apt 10.m4a</text>
+      <text x="34" y="63" font-size="11" fill="#777">your voice memo · 18.9 seconds · AAC format</text>
+      <line x1="160" y1="78" x2="160" y2="105" stroke="#b3542c" stroke-width="2" marker-end="url(#arr)"/>
+      <text x="175" y="97" font-size="11" fill="#555"><tspan font-family="monospace" font-weight="700">afconvert</tspan> — macOS's built-in converter (we had no ffmpeg; didn't need it)</text>
+      <rect x="20" y="108" width="280" height="58" rx="9" fill="#e5f1e8" stroke="#3e7d4e" stroke-width="1.8"/>
+      <text x="34" y="132" font-size="12.5" font-weight="700">🔊 memo_16k.wav</text>
+      <text x="34" y="151" font-size="11" fill="#777">302,741 plain numbers · 16,000 per second</text>
+      <line x1="160" y1="166" x2="160" y2="193" stroke="#b3542c" stroke-width="2" marker-end="url(#arr)"/>
+      <text x="175" y="185" font-size="11" fill="#555"><tspan font-family="monospace" font-weight="700">run_whisper.py</tspan> — lesson 6's steps ②–④ happen inside one call</text>
+      <rect x="20" y="196" width="280" height="58" rx="9" fill="#e3edf5" stroke="#2c5e8a" stroke-width="1.8"/>
+      <text x="34" y="220" font-size="12.5" font-weight="700">👁⌨️ whisper.load_model("base")</text>
+      <text x="34" y="239" font-size="11" fill="#777">downloaded once (~140 MB) to ~/.cache/whisper</text>
+      <line x1="160" y1="254" x2="160" y2="281" stroke="#b3542c" stroke-width="2" marker-end="url(#arr)"/>
+      <rect x="20" y="284" width="280" height="40" rx="9" fill="#fff" stroke="#3e7d4e" stroke-width="1.8"/>
+      <text x="34" y="309" font-size="12.5" font-weight="700">📄 memo_transcript_base.json</text>
+      <g font-size="11.5" fill="#555">
+        <text x="330" y="40" font-weight="700" fill="#1a1a1a">Why each hop exists:</text>
+        <text x="330" y="66">• Whisper wants numbers at 16,000/sec —</text>
+        <text x="340" y="83">the .wav is that list, nothing more.</text>
+        <text x="330" y="110">• The model turned the numbers into a</text>
+        <text x="340" y="127">sound-picture and typed what it "saw",</text>
+        <text x="340" y="144">dropping clock marks as it went.</text>
+        <text x="330" y="171">• The JSON has the exact shape of the</text>
+        <text x="340" y="188">notebook's shipped transcript — your</text>
+        <text x="340" y="205">memo could enter lesson 5's pipeline</text>
+        <text x="340" y="222">right now, unchanged.</text>
+        <text x="330" y="252" font-style="italic" fill="#888">One thing you did NOT do: train anything.</text>
+        <text x="330" y="269" font-style="italic" fill="#888">Whisper arrived already knowing English —</text>
+        <text x="330" y="286" font-style="italic" fill="#888">you only handed it your 19 seconds.</text>
+      </g>
+    </svg>
+    <div class="visual-caption">The whole run was lesson 6's road, walked with real files: <strong>lunchbox → number list → look-and-type → timestamped JSON</strong>.</div>
+  </div>
+
+  <h2>Where everything is saved</h2>
+  <div class="analogy">
+    <span class="tag">Analogy</span>
+    My working folder is a <strong>hotel room whiteboard</strong> — scribbles there can be wiped between visits. Your results deserved a <strong>notebook page</strong>, so I copied them into your project.
+  </div>
+  <div class="visual">
+    <div class="visual-label">Your artifacts · 14_multimodal_rag/experiments/</div>
+    <table class="filetable">
+      <tr><th>File</th><th>What it is</th></tr>
+      <tr><td><code>memo_transcript_base.json</code></td><td><strong>The answer to "where is it saved."</strong> Your transcript from the <code>base</code> model — 5 segments with start/end times.</td></tr>
+      <tr><td><code>memo_transcript_small.json</code></td><td>The rerun with the <code>small</code> model (see below) — 2 cleaner segments.</td></tr>
+      <tr><td><code>memo_16k.wav</code></td><td>Your voice as 302,741 numbers — the exact input Whisper read.</td></tr>
+      <tr><td><code>run_whisper.py</code></td><td>The script, annotated with lesson 6's step numbers. Rerun anytime: <code>uv run --with openai-whisper python experiments/run_whisper.py</code></td></tr>
+    </table>
+    <div class="visual-caption">Your original memo stays untouched at <code>/Users/parth/39-60 54th St, Apt 10.m4a</code>. The downloaded models live in <code>~/.cache/whisper/</code> and are reused forever.</div>
+  </div>
+
+  <h2>"Not totally accurate" — you're right. Here's why.</h2>
+  <div class="analogy">
+    <span class="tag">Analogy</span>
+    Whisper comes in sizes, like hiring note-takers. <code>base</code> is the <strong>fast intern</strong>: quick, cheap, occasionally writes down what something <em>sounded like</em>. <code>small</code> is a <strong>careful senior</strong>: slower, but hears through mumbles. Same training, more brainpower.
+  </div>
+  <p>While preparing this lesson I reran your exact memo with the <code>small</code> model. Compare, word by word:</p>
+
+  <div class="visual">
+    <div class="visual-label">Side-by-side · your memo, two model sizes, real outputs</div>
+    <div class="cmp">
+      <div class="col" style="border-color:var(--gold);">
+        <h4 style="background:var(--gold);">base — 74M parameters (your first run)</h4>
+        <div class="body">
+          [0.0–3.6] I look and try to open <span class="miss">the eyes of the spirit.</span><br>
+          [3.6–8.9] And my goal is to understand how transcribing works.<br>
+          [8.9–12.5] And the main idea is that once I know it,<br>
+          [12.5–16.7] I should be able to <span class="miss">time stamp</span> everything.<br>
+          [16.7–18.7] I want in a video.
+        </div>
+      </div>
+      <div class="col" style="border-color:var(--green);">
+        <h4 style="background:var(--green);">small — 244M parameters (the rerun)</h4>
+        <div class="body">
+          [0.0–7.8] I'm trying to open <span class="better">my eyes for it</span> and my goal is to understand how transcribing works.<br>
+          [8.9–18.7] And the main idea is that once I know it, I should be able to <span class="better">timestamp everything I want in a video.</span>
+        </div>
+      </div>
+    </div>
+    <div class="visual-caption">Three things to observe: the opening phrase changed completely (both may still be wrong — only <em>you</em> know); "time stamp everything. / I want in a video." became one correct sentence; and 5 choppy segments became 2 natural ones. More parameters → better hearing <em>and</em> better phrasing.</div>
+  </div>
+
+  <p>Notice the <em>kind</em> of mistake: "the eyes of the spirit" isn't random garbage — it's a <strong>phonetically plausible guess</strong>. That's the spectrogram story from <a href="0006-where-the-transcript-comes-from.html">lesson 6</a> confirming itself: the model heard sound-shapes and picked the likeliest words. When it's unsure (fast speech, first words of a recording, background noise, accents), "likeliest" can miss.</p>
+
+  <div class="keyidea">
+    <span class="tag">Key idea · measuring "not totally accurate"</span>
+    The field's ruler is <strong>word error rate (WER)</strong>: what fraction of words are wrong. But look what computing it requires — <strong>the true words, written down</strong>. An answer key. You've met this pattern: lesson 5's recall@3 needed a <em>gold set</em>. Evaluation always starts with ground truth. <em>Tell me what you actually said, and we'll compute your memo's real WER for both models.</em>
+  </div>
+
+  <div class="visual">
+    <div class="visual-label">The size dial · what you're trading (from the Whisper README)</div>
+    <table class="filetable">
+      <tr><th>Size</th><th>Parameters</th><th>Feel</th></tr>
+      <tr><td><code>tiny</code> / <code>base</code></td><td>39M / 74M</td><td>Fast intern — live drafts, quick experiments (your first run)</td></tr>
+      <tr><td><code>small</code></td><td>244M</td><td>Careful senior — the sweet spot for most projects (your rerun)</td></tr>
+      <tr><td><code>medium</code> / <code>large</code></td><td>769M / 1.5B</td><td>Court stenographer — hardest audio, slowest, most accurate</td></tr>
+    </table>
+    <div class="visual-caption">Exact speed/memory numbers are in the <a href="https://github.com/openai/whisper">README's model table</a>. The pattern is the one you just witnessed firsthand: <strong>parameters buy accuracy, and cost time.</strong></div>
+  </div>
+
+  <h2>Here's exactly where this lives in your files</h2>
+  <div class="visual">
+    <div class="visual-label">Code spotlight · experiments/run_whisper.py — the two lines that matter now</div>
+    <pre class="code">model = whisper.load_model(<span class="hl">"base"</span>)      <span class="cm"># ← the size dial. Change to "small" and</span>
+result = model.transcribe(audio, fp16=False) <span class="cm">#   rerun to reproduce today's comparison.</span></pre>
+    <div class="visual-caption">That one word is the entire accuracy lever you saw today. Everything else in the run stays identical.</div>
+  </div>
+
+  <h2>Prove it to yourself</h2>
+
+  <div class="quiz-q">
+    <p class="qtext">1. Why did the <code>small</code> model beat <code>base</code> on your memo?</p>
+    <button class="quiz-opt" data-good="1" data-why="244M vs 74M parameters — more capacity to match ambiguous sound-shapes to the right words. Same audio, same method, bigger brain.">A bigger model maps sounds onto words more accurately</button>
+    <button class="quiz-opt" data-why="Repetition changes nothing — the same model on the same audio produces essentially the same guess again.">Running the same audio twice always improves the output</button>
+    <button class="quiz-opt" data-why="Both sizes know the same languages from the same training — small just has more parameters applying that knowledge.">It downloaded a language pack the base model lacks</button>
+    <div class="quiz-feedback"></div>
+  </div>
+
+  <div class="quiz-q">
+    <p class="qtext">2. To actually <em>measure</em> accuracy (WER), you first need:</p>
+    <button class="quiz-opt" data-good="1" data-why="Ground truth — same reason recall@3 needed the gold set. No answer key, no measurement; only vibes.">The true words, written down as an answer key</button>
+    <button class="quiz-opt" data-why="Two models disagreeing tells you at least one is wrong — but not which, and not by how much.">The same audio transcribed by two different models</button>
+    <button class="quiz-opt" data-why="Confidence is the model grading itself — useful, but a model can be confidently wrong.">A confidence score attached to every predicted word</button>
+    <div class="quiz-feedback"></div>
+  </div>
+
+  <div class="quiz-q">
+    <p class="qtext">3. Whisper's mistakes <em>sound like</em> what you said. Why?</p>
+    <button class="quiz-opt" data-good="1" data-why="It reads the spectrogram and picks the most probable words for those sound-shapes — so errors rhyme with the truth.">It guesses the likeliest words from the sound picture</button>
+    <button class="quiz-opt" data-why="It has no document index and looks nothing up — every word is generated from the audio in front of it.">It copies words out of documents indexed during training</button>
+    <button class="quiz-opt" data-why="Quiet audio makes it less certain, not random — guesses stay anchored to whatever sounds it did catch.">It picks random words whenever the audio gets quiet</button>
+    <div class="quiz-feedback"></div>
+  </div>
+
+  <h2>Full circle</h2>
+  <p>Listen to what your own memo says: <em>"once I know it, I should be able to timestamp everything I want in a video."</em> You recorded your goal — and the pipeline you're learning transcribed it, timestamped it, and handed it back. Your memo's segments could drop straight into lesson 5's Cell 9.4 today.</p>
+  <div class="callout-next">
+    <strong>Two follow-ups, pick either:</strong> tell me what you <em>actually said</em> in that first sentence and we'll compute the real WER of both models on your memo — or bring a longer recording (a lecture clip, a meeting) and we'll run the full lesson-5 pipeline on it: transcript, chunks, and questions answered with timestamps from <em>your</em> audio.
+  </div>
+
+  <div class="lesson-footer">
+    <p>📖 <strong>Primary source:</strong> <a href="https://github.com/openai/whisper">the Whisper README</a> — read the model-size table you just experienced from the inside.</p>
+    <p>🗂 References: <a href="../reference/three-retrieval-strategies.html">three strategies cheat sheet</a> · <a href="0006-where-the-transcript-comes-from.html">Lesson 6 — where the transcript comes from</a></p>
+    <p>💬 <strong>Stuck or curious?</strong> Ask me in the Claude Code session — "compute the WER with me", "why did base split 5 segments where small made 2?", "which size should a real project pick?"</p>
+  </div>
+
+</main>
+</body>
+</html>

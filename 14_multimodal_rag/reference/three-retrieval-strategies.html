@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cheat sheet · Three ways to find a picture</title>
+<link rel="stylesheet" href="../assets/course.css">
+<style>
+  .lesson { max-width: 52rem; }
+  .strat { display: flex; gap: .8rem; flex-wrap: wrap; margin: 1.2rem 0; }
+  .strat .card { flex: 1 1 200px; border-radius: 10px; overflow: hidden; border: 1.5px solid var(--line); font-family: var(--sans); }
+  .strat .card h4 { color: #fff; padding: .45rem .8rem; font-size: .85rem; }
+  .strat .card .body { padding: .7rem .9rem; font-size: .78rem; line-height: 1.7; }
+  table.ref { width: 100%; border-collapse: collapse; font-family: var(--sans); font-size: .8rem; margin: 1rem 0; }
+  table.ref th { text-align: left; padding: .45rem .6rem; background: var(--code-bg); }
+  table.ref td { padding: .45rem .6rem; border-top: 1px solid var(--line); vertical-align: top; }
+  dl.gloss dt { font-weight: 700; margin-top: .9rem; }
+  dl.gloss dd { margin-left: 0; color: var(--ink-soft); font-size: .95rem; }
+  @media print { .visual { box-shadow: none; } body { background: #fff; } }
+</style>
+</head>
+<body>
+<main class="lesson">
+
+  <p class="kicker">Reference · keep this open for notebook Sections 5–9</p>
+  <h1>Three ways to find a picture with words</h1>
+  <p class="lede">The A/B/C strategies, their weak spots, the RRF formula, and the words that matter — on one page.</p>
+
+  <h2>The three strategies</h2>
+  <div class="strat">
+    <div class="card" style="border-color:var(--gold);">
+      <h4 style="background:var(--gold);">A · Search the catalog cards</h4>
+      <div class="body">
+        VLM writes a text card per image (once); everything lives in <strong>one text collection</strong>.<br><br>
+        <strong>Wins:</strong> simplest; strong for text-heavy corpora.<br>
+        <strong>Weak spot:</strong> <em>caption bottleneck</em> — if the card missed it, it's unfindable.<br>
+        <strong>Notebook:</strong> Cell 5.1
+      </div>
+    </div>
+    <div class="card" style="border-color:var(--green);">
+      <h4 style="background:var(--green);">B · One shared CLIP map</h4>
+      <div class="body">
+        CLIP embeds sentences <strong>and raw pixels</strong> into one space; a question matches images directly.<br><br>
+        <strong>Wins:</strong> no captions needed; finds images by their pixels.<br>
+        <strong>Weak spots:</strong> <em>modality gap</em>; can't read values off charts.<br>
+        <strong>Notebook:</strong> Cells 5.2–5.3
+      </div>
+    </div>
+    <div class="card" style="border-color:var(--blue);">
+      <h4 style="background:var(--blue);">C · Two stores, merged by rank</h4>
+      <div class="body">
+        Text store (best text embedder) + image store (CLIP); ask both, fuse with <strong>RRF</strong>.<br><br>
+        <strong>Wins:</strong> each modality gets its specialist; the practical default.<br>
+        <strong>Weak spot:</strong> most moving parts; two searches per query.<br>
+        <strong>Notebook:</strong> Cell 5.4
+      </div>
+    </div>
+  </div>
+
+  <div class="keyidea">
+    <span class="tag">The rule that pairs with all three</span>
+    Whatever strategy <em>finds</em> the image, the VLM answers from the <strong>real pixels</strong> (re-loaded via <code>source_path</code>, Cell 7.1). Cards and CLIP <em>find</em>; only eyes <em>read</em>.
+  </div>
+
+  <h2>RRF in one box</h2>
+  <table class="ref">
+    <tr><th>Formula</th><td><code>score(item) = Σ over lists: 1 / (60 + rank)</code> — then sort descending. Rank starts at 1; the 60 stops rank #1 from crushing #2.</td></tr>
+    <tr><th>Why ranks, not scores</th><td>Different embedders score on incomparable scales (two judges, two rulers). Placements are always fair.</td></tr>
+    <tr><th>What rises</th><td>Items appearing in <em>both</em> lists sum contributions — agreement is the strongest signal.</td></tr>
+    <tr><th>Source</th><td><a href="https://plg.uwaterloo.ca/~gvcormac/cormacksigir09-rrf.pdf">Cormack, Clarke &amp; Buettcher 2009</a> (2 pages)</td></tr>
+  </table>
+
+  <h2>Evaluation &amp; video, compressed</h2>
+  <table class="ref">
+    <tr><th>recall@3</th><td>Share of gold questions where a correct chunk appeared in the top 3. Grades <em>retrieval</em> only. Cell 8.1.</td></tr>
+    <tr><th>Answer quality</th><td>Graded separately — human review or LLM-as-judge. A wrong answer can be retrieval's fault or generation's.</td></tr>
+    <tr><th>Video chunk</th><td>What was said (transcript segment) + what was shown (keyframes in that window) + <code>t_start</code>/<code>t_end</code>. Cell 9.4.</td></tr>
+    <tr><th>Keyframes</th><td>One frame per interval (or scene change) — never all frames. Dedupe near-identicals. Cell 9.3.</td></tr>
+    <tr><th>Video retrieval</th><td>Strategy C wearing a watch: transcript → text store, keyframes → CLIP store, RRF merges, answers cite [MM:SS]. Cells 9.5–9.6.</td></tr>
+  </table>
+
+  <h2>Words that matter</h2>
+  <dl class="gloss">
+    <dt>VLM (Vision-Language Model)</dt>
+    <dd>A chat model that accepts images inside its messages. Does two jobs: archivist (parse at ingestion) and expert reader (read pixels at answer time).</dd>
+    <dt>Catalog card (caption)</dt>
+    <dd>The structured text a VLM writes about an image at ingestion — embedded like any text chunk so the image can be found.</dd>
+    <dt>CLIP</dt>
+    <dd>A model that embeds text and images into one shared meaning map, trained on 400M image–caption pairs. Finds; cannot read.</dd>
+    <dt>Modality gap</dt>
+    <dd>In CLIP's space, text clusters near text and images near images — so mixed collections rank text above the best image. Fix: filter per modality, or separate stores + RRF.</dd>
+    <dt>Caption bottleneck</dt>
+    <dd>Strategy A's failure mode: retrieval can only match what the card happened to mention.</dd>
+    <dt>RRF (Reciprocal Rank Fusion)</dt>
+    <dd>Merging ranked lists by summing 1/(60+rank) per item — placements, never raw scores.</dd>
+    <dt>recall@k</dt>
+    <dd>The share of test questions where a correct chunk appears in the top k retrieved.</dd>
+    <dt>Gold set</dt>
+    <dd>The answer key: question → the chunk id(s) that should come back.</dd>
+    <dt>Keyframe</dt>
+    <dd>A sampled video frame standing in for its few seconds of footage.</dd>
+  </dl>
+
+  <div class="lesson-footer">
+    <p>From lessons <a href="../lessons/0003-catalog-cards-vs-a-shared-map.html">3</a>, <a href="../lessons/0004-two-judges-one-leaderboard.html">4</a> and <a href="../lessons/0005-grade-it-then-press-play.html">5</a> · companion: <a href="text-rag-pipeline.html">the text RAG pipeline</a></p>
+  </div>
+
+</main>
+</body>
+</html>

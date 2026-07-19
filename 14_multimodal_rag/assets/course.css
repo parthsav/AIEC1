@@ -1,0 +1,172 @@
+/* ============================================================
+   Multimodal RAG course — shared stylesheet
+   Linked by every lesson and reference doc. Tufte-inspired:
+   generous margins, calm palette, content first.
+   ============================================================ */
+
+:root {
+  --ink: #1a1a1a;
+  --ink-soft: #555;
+  --paper: #fdfcf9;
+  --card: #ffffff;
+  --line: #e3ded4;
+  --accent: #b3542c;        /* warm rust — headings, active states */
+  --accent-soft: #f6e8e0;
+  --blue: #2c5e8a;          /* diagrams: text modality */
+  --blue-soft: #e3edf5;
+  --green: #3e7d4e;         /* diagrams: success / retrieval hits */
+  --green-soft: #e5f1e8;
+  --gold: #9a7b2d;
+  --gold-soft: #f5eeda;
+  --code-bg: #f4f1ea;
+  --serif: "Iowan Old Style", "Palatino", "Georgia", serif;
+  --sans: -apple-system, "Segoe UI", "Helvetica Neue", sans-serif;
+  --mono: "SF Mono", "Menlo", "Consolas", monospace;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+html { font-size: 17px; }
+
+body {
+  font-family: var(--serif);
+  background: var(--paper);
+  color: var(--ink);
+  line-height: 1.65;
+}
+
+.lesson {
+  max-width: 46rem;
+  margin: 0 auto;
+  padding: 3rem 1.5rem 6rem;
+}
+
+/* ---------- typography ---------- */
+
+h1 { font-size: 2.1rem; line-height: 1.2; margin-bottom: .4rem; font-weight: 650; }
+h2 { font-size: 1.45rem; margin: 3rem 0 .8rem; font-weight: 600; color: var(--accent); }
+h3 { font-size: 1.1rem;  margin: 2rem 0 .6rem; font-weight: 600; }
+p  { margin-bottom: 1rem; }
+li { margin-bottom: .4rem; }
+ul, ol { margin: 0 0 1rem 1.4rem; }
+a  { color: var(--blue); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+strong { font-weight: 650; }
+
+.kicker {
+  font-family: var(--sans); font-size: .75rem; letter-spacing: .14em;
+  text-transform: uppercase; color: var(--accent); margin-bottom: .6rem;
+}
+.lede { font-size: 1.15rem; color: var(--ink-soft); margin-bottom: 2rem; }
+.meta { font-family: var(--sans); font-size: .8rem; color: var(--ink-soft); margin-bottom: 2.5rem; }
+
+/* ---------- callouts ---------- */
+
+.analogy {
+  background: var(--gold-soft); border-left: 4px solid var(--gold);
+  padding: 1rem 1.2rem; margin: 1.5rem 0; border-radius: 0 8px 8px 0;
+}
+.analogy .tag, .keyidea .tag {
+  display: block; font-family: var(--sans); font-size: .7rem;
+  letter-spacing: .12em; text-transform: uppercase; margin-bottom: .35rem;
+}
+.analogy .tag { color: var(--gold); }
+.keyidea {
+  background: var(--blue-soft); border-left: 4px solid var(--blue);
+  padding: 1rem 1.2rem; margin: 1.5rem 0; border-radius: 0 8px 8px 0;
+}
+.keyidea .tag { color: var(--blue); }
+.callout-next {
+  background: var(--accent-soft); border: 1px solid var(--accent);
+  padding: 1.2rem 1.4rem; margin: 2rem 0; border-radius: 10px;
+}
+
+/* ---------- visuals ---------- */
+
+.visual {
+  background: var(--card); border: 1px solid var(--line); border-radius: 12px;
+  padding: 1.4rem; margin: 1.8rem 0;
+  box-shadow: 0 1px 4px rgba(0,0,0,.04);
+}
+.visual-label {
+  font-family: var(--sans); font-size: .72rem; font-weight: 700;
+  letter-spacing: .13em; text-transform: uppercase; color: var(--accent);
+  margin-bottom: .8rem;
+}
+.visual-caption {
+  font-family: var(--sans); font-size: .84rem; color: var(--ink-soft);
+  margin-top: .9rem; line-height: 1.5; border-top: 1px dashed var(--line); padding-top: .7rem;
+}
+.visual svg { display: block; max-width: 100%; height: auto; }
+.visual img { max-width: 100%; border: 1px solid var(--line); border-radius: 6px; }
+
+/* ---------- buttons & stepper ---------- */
+
+button.ctl {
+  font-family: var(--sans); font-size: .85rem; font-weight: 600;
+  padding: .45rem 1rem; border-radius: 999px; cursor: pointer;
+  border: 1.5px solid var(--accent); background: var(--card); color: var(--accent);
+  transition: background .15s, color .15s;
+}
+button.ctl:hover:not(:disabled) { background: var(--accent); color: #fff; }
+button.ctl:disabled { opacity: .35; cursor: default; }
+button.ctl.primary { background: var(--accent); color: #fff; }
+button.ctl.primary:hover:not(:disabled) { background: #94431f; }
+
+.stepper-controls { display: flex; gap: .6rem; align-items: center; margin-top: 1rem; }
+.stepper-progress { font-family: var(--sans); font-size: .8rem; color: var(--ink-soft); margin-left: auto; }
+
+.step-pane { display: none; }
+.step-pane.active { display: block; animation: fadein .35s ease; }
+@keyframes fadein { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+
+.step-title { font-family: var(--sans); font-weight: 700; font-size: .95rem; margin-bottom: .5rem; }
+.step-note  { font-family: var(--sans); font-size: .88rem; color: var(--ink-soft); margin-top: .6rem; }
+
+/* ---------- code ---------- */
+
+pre.code {
+  background: var(--code-bg); border: 1px solid var(--line); border-radius: 8px;
+  padding: 1rem 1.2rem; overflow-x: auto; font-family: var(--mono);
+  font-size: .78rem; line-height: 1.6; margin: 1rem 0;
+}
+pre.code .hl { background: #ffe9a8; border-radius: 3px; padding: 1px 3px; }
+pre.code .cm { color: #8a8574; }
+code {
+  font-family: var(--mono); font-size: .82em;
+  background: var(--code-bg); padding: .1em .35em; border-radius: 4px;
+}
+.code-where {
+  font-family: var(--sans); font-size: .8rem; color: var(--ink-soft);
+  margin-bottom: .3rem;
+}
+
+/* ---------- quiz ---------- */
+
+.quiz-q { margin: 1.6rem 0; }
+.quiz-q .qtext { font-weight: 600; margin-bottom: .7rem; }
+.quiz-opt {
+  display: block; width: 100%; text-align: left; font-family: var(--serif);
+  font-size: .95rem; padding: .6rem .9rem; margin-bottom: .5rem;
+  border: 1.5px solid var(--line); border-radius: 8px; background: var(--card);
+  cursor: pointer; transition: border-color .15s, background .15s;
+}
+.quiz-opt:hover:not(:disabled) { border-color: var(--accent); }
+.quiz-opt.correct { border-color: var(--green); background: var(--green-soft); }
+.quiz-opt.wrong   { border-color: #b0473a; background: #f7e6e3; }
+.quiz-feedback {
+  font-family: var(--sans); font-size: .85rem; margin-top: .4rem;
+  padding: .6rem .9rem; border-radius: 8px; display: none;
+}
+.quiz-feedback.show { display: block; animation: fadein .3s ease; }
+.quiz-feedback.good { background: var(--green-soft); color: var(--green); }
+.quiz-feedback.bad  { background: #f7e6e3; color: #8c3327; }
+
+/* ---------- footer / nav ---------- */
+
+.lesson-footer {
+  margin-top: 4rem; padding-top: 1.5rem; border-top: 2px solid var(--line);
+  font-family: var(--sans); font-size: .88rem; color: var(--ink-soft);
+}
+
+/* diagram text uses sans everywhere */
+svg text { font-family: var(--sans); }
