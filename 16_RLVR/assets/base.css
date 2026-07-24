@@ -1,0 +1,356 @@
+/* Shared stylesheet for the "RLVR (Reinforcement Learning with Verifiable
+   Rewards)" teaching workspace — Session 16, continuing the Session 15
+   "Reasoning Model Fine-Tuning" visual language for continuity.
+   Reuse this across every lesson and reference doc — don't re-write these
+   patterns inline in a lesson. Add new reusable pieces here as they appear. */
+
+:root {
+  --ink: #22201d;
+  --ink-soft: #524d46;
+  --paper: #faf6ee;
+  --paper-raised: #ffffff;
+  --rule: #ddd3c2;
+  --accent: #a8452f;
+  --accent-soft: #f2e2da;
+  --good: #2f6b4f;
+  --good-soft: #e3efe6;
+  --bad: #a8452f;
+  --bad-soft: #f6e6e1;
+  --code-bg: #2b2622;
+  --code-ink: #efe7d8;
+  --max-width: 760px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --ink: #ece6da;
+    --ink-soft: #b9b0a0;
+    --paper: #1c1a17;
+    --paper-raised: #262320;
+    --rule: #3c362e;
+    --accent: #e2795c;
+    --accent-soft: #3a2b25;
+    --good: #7fc79e;
+    --good-soft: #23332a;
+    --bad: #e2795c;
+    --bad-soft: #3a2822;
+    --code-bg: #14120f;
+    --code-ink: #efe7d8;
+  }
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  padding: 2.5rem 1.25rem 6rem;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+  font-size: 1.08rem;
+  line-height: 1.6;
+}
+
+.page {
+  max-width: var(--max-width);
+  margin: 0 auto;
+}
+
+h1, h2, h3 {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+  font-weight: 700;
+  line-height: 1.25;
+  color: var(--ink);
+}
+
+h1 { font-size: 1.9rem; margin: 0 0 0.3rem; }
+h2 { font-size: 1.35rem; margin: 2.2rem 0 0.8rem; }
+h3 { font-size: 1.05rem; margin: 1.6rem 0 0.6rem; }
+
+.kicker {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--accent);
+  margin: 0 0 0.6rem;
+}
+
+p { margin: 0 0 1rem; }
+a { color: var(--accent); }
+a:visited { color: var(--accent); }
+
+/* ---------- Top nav ---------- */
+.crumbs {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+  font-size: 0.85rem;
+  color: var(--ink-soft);
+  margin-bottom: 1.5rem;
+}
+.crumbs a { text-decoration: none; }
+.crumbs a:hover { text-decoration: underline; }
+
+/* ---------- Analogy / callout boxes ---------- */
+.box {
+  border-radius: 10px;
+  padding: 1rem 1.2rem;
+  margin: 1.2rem 0;
+}
+.analogy {
+  background: var(--accent-soft);
+  border-left: 4px solid var(--accent);
+}
+.analogy .box-label { color: var(--accent); }
+.citation {
+  background: var(--paper-raised);
+  border: 1px solid var(--rule);
+  font-size: 0.92rem;
+}
+.callout {
+  background: var(--paper-raised);
+  border: 1px solid var(--rule);
+}
+.box-label {
+  display: block;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-size: 0.68rem;
+  font-weight: 700;
+  margin-bottom: 0.4rem;
+}
+
+/* ---------- Visuals: illustrations & animations ---------- */
+.visual {
+  background: var(--paper-raised);
+  border: 1px solid var(--rule);
+  border-radius: 12px;
+  padding: 1.2rem;
+  margin: 1.4rem 0 0.6rem;
+}
+.visual-label {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+  font-weight: 700;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--ink-soft);
+  margin: 0 0 0.6rem;
+}
+.visual-caption {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+  font-size: 0.85rem;
+  color: var(--ink-soft);
+  margin: 0.6rem 0 1.4rem;
+  text-align: center;
+}
+.visual svg { width: 100%; height: auto; display: block; }
+.visual-controls {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: center;
+  margin-top: 0.8rem;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+}
+
+button.btn {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+  font-size: 0.85rem;
+  font-weight: 600;
+  background: var(--paper);
+  color: var(--ink);
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+  padding: 0.45rem 0.9rem;
+  cursor: pointer;
+}
+button.btn:hover { border-color: var(--accent); color: var(--accent); }
+button.btn:disabled { opacity: 0.4; cursor: default; }
+button.btn.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+
+/* ---------- Step-through ---------- */
+.stepper .step { display: none; }
+.stepper .step.active { display: block; animation: fadein 0.4s ease; }
+.stepper .step-count {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+  font-size: 0.8rem;
+  color: var(--ink-soft);
+  text-align: center;
+  margin-top: 0.5rem;
+}
+@keyframes fadein { from { opacity: 0; } to { opacity: 1; } }
+
+/* ---------- Side by side comparison ---------- */
+.compare {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  margin: 1rem 0;
+}
+@media (max-width: 560px) {
+  .compare { grid-template-columns: 1fr; }
+}
+.compare .col {
+  border-radius: 10px;
+  padding: 0.9rem 1rem;
+  font-size: 0.95rem;
+}
+.compare .col.no { background: var(--bad-soft); border: 1px solid var(--bad); }
+.compare .col.yes { background: var(--good-soft); border: 1px solid var(--good); }
+.compare h4 {
+  margin: 0 0 0.5rem;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+  font-size: 0.9rem;
+}
+
+/* ---------- Code ---------- */
+pre {
+  background: var(--code-bg);
+  color: var(--code-ink);
+  border-radius: 10px;
+  padding: 1rem 1.1rem;
+  overflow-x: auto;
+  font-size: 0.85rem;
+  line-height: 1.55;
+}
+code {
+  font-family: "SF Mono", Menlo, Consolas, monospace;
+}
+:not(pre) > code {
+  background: var(--accent-soft);
+  padding: 0.1rem 0.35rem;
+  border-radius: 4px;
+  font-size: 0.88em;
+}
+pre .hl { background: rgba(226, 121, 92, 0.28); display: inline-block; width: 100%; border-radius: 4px; }
+.code-file {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+  font-size: 0.78rem;
+  color: var(--ink-soft);
+  margin: 1rem 0 0.3rem;
+}
+
+/* ---------- Quiz ---------- */
+.quiz {
+  background: var(--paper-raised);
+  border: 1px solid var(--rule);
+  border-radius: 10px;
+  padding: 1rem 1.2rem;
+  margin: 1.2rem 0;
+}
+.quiz .q { font-weight: 600; margin-bottom: 0.6rem; }
+.quiz .choices { display: flex; flex-direction: column; gap: 0.5rem; }
+.quiz .choice {
+  text-align: left;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+  border: 1px solid var(--rule);
+  background: var(--paper);
+  color: var(--ink);
+  border-radius: 8px;
+  padding: 0.55rem 0.8rem;
+  cursor: pointer;
+  font-size: 0.92rem;
+}
+.quiz .choice:hover { border-color: var(--accent); }
+.quiz .choice.correct { background: var(--good-soft); border-color: var(--good); }
+.quiz .choice.wrong { background: var(--bad-soft); border-color: var(--bad); }
+.quiz .feedback { margin-top: 0.7rem; font-size: 0.9rem; display: none; }
+.quiz .feedback.show { display: block; }
+
+/* ---------- Toggle groups (click a tab, see a panel) ---------- */
+.toggle-panel { display: none; }
+.toggle-panel.active { display: block; animation: fadein 0.35s ease; }
+button.btn.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+
+/* ---------- Stacked reward bar ----------
+   Categorical slots follow the workspace's validated 5-hue order (fixed,
+   never reassigned per-chart): series-1..5 = blue, orange, aqua, yellow, magenta. */
+:root {
+  --series-1: #2a78d6;
+  --series-2: #eb6834;
+  --series-3: #1baf7a;
+  --series-4: #eda100;
+  --series-5: #e87ba4;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --series-1: #3987e5;
+    --series-2: #d95926;
+    --series-3: #199e70;
+    --series-4: #c98500;
+    --series-5: #d55181;
+  }
+}
+.stack-bar {
+  display: flex;
+  gap: 2px;
+  height: 22px;
+  border-radius: 5px;
+  background: var(--rule);
+  margin: 0.9rem 0 0.4rem;
+}
+.stack-bar.empty {
+  border: 1.5px dashed var(--rule);
+}
+.stack-seg { border-radius: 2px; }
+.stack-seg:first-child { border-top-left-radius: 4px; border-bottom-left-radius: 4px; }
+.stack-seg:last-child { border-top-right-radius: 4px; border-bottom-right-radius: 4px; }
+.stack-total {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+  font-size: 0.8rem;
+  color: var(--ink-soft);
+  margin: 0 0 1rem;
+}
+.stack-total strong { color: var(--ink); font-size: 1rem; }
+.stack-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem 1.1rem;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+  font-size: 0.78rem;
+  color: var(--ink-soft);
+  margin-bottom: 1rem;
+}
+.stack-legend span { color: var(--ink); font-weight: 600; }
+.stack-legend .dot {
+  display: inline-block;
+  width: 0.7rem;
+  height: 0.7rem;
+  border-radius: 3px;
+  margin-right: 0.35rem;
+  vertical-align: middle;
+}
+
+/* ---------- Table ---------- */
+table { width: 100%; border-collapse: collapse; margin: 1rem 0; font-size: 0.92rem; }
+th, td { text-align: left; padding: 0.5rem 0.6rem; border-bottom: 1px solid var(--rule); }
+th { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--ink-soft); }
+
+/* ---------- Footer nav between lessons ---------- */
+.lesson-nav {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 3rem;
+  padding-top: 1.2rem;
+  border-top: 1px solid var(--rule);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+  font-size: 0.9rem;
+}
+.ask-agent {
+  margin-top: 2.5rem;
+  padding: 1rem 1.2rem;
+  background: var(--accent-soft);
+  border-radius: 10px;
+  font-size: 0.9rem;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+}
+
+/* ---------- Print (mainly for ./reference/*.html cheat sheets) ---------- */
+@media print {
+  body { background: #fff; color: #000; padding: 0.4in; }
+  .crumbs, .ask-agent, .lesson-nav, .visual-controls, button.btn { display: none !important; }
+  a { color: #000; text-decoration: underline; }
+  .box, .visual { border: 1px solid #999; break-inside: avoid; }
+  pre { background: #f2f2f2; color: #000; border: 1px solid #ccc; }
+}

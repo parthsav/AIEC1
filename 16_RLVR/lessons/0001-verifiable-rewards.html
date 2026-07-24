@@ -1,0 +1,96 @@
+<title>Verifiable Rewards — RLVR</title>
+<link rel="stylesheet" href="../assets/base.css">
+<div class="page">
+
+  <div class="crumbs"><a href="index.html">All lessons</a> · <a href="0000-big-picture.html">← Big Picture</a></div>
+
+  <p class="kicker">Lesson 0001 · Verifiable Rewards</p>
+  <h1>A Referee With No Opinions</h1>
+
+  <div class="box analogy">
+    <span class="box-label">Analogy first</span>
+    Think about two kinds of referee. A soccer goal has <strong>goal-line technology</strong>: a sensor either detects the ball fully crossed the line, or it didn't. No opinion, no debate, same answer every time. A gymnastics judge is the opposite: they watch a routine and score it based on trained taste — two judges can watch the same routine and score it differently. RLVR only works with the first kind of referee.
+  </div>
+
+  <p>A reward is <strong>verifiable</strong> when a program — not a person, not another trained model — can check it and get the same answer every time. "Is 156 the right answer to 12×13?" is goal-line technology: a calculator settles it. "Is this poem beautiful?" is gymnastics judging: it needs taste, and taste has to be learned from human examples (that's what RLHF's <em>learned reward model</em> is — a model trained to imitate a judge's taste).</p>
+
+  <div class="compare">
+    <div class="col no">
+      <h4>RLHF: a learned reward model</h4>
+      Humans rank pairs of outputs ("this one's better"). A separate neural network is trained to predict those rankings. It's a judge — approximate, and itself capable of being fooled.
+    </div>
+    <div class="col yes">
+      <h4>RLVR: a verifier</h4>
+      A deterministic program — regex match, unit test, calculator — checks the output directly. No training, no judgment call, no drift. Cheap, objective, reproducible.
+    </div>
+  </div>
+
+  <h2>Two pieces make a verifier possible: the policy, and the ground truth</h2>
+
+  <h3>1. The policy is chosen to sometimes fail — on purpose</h3>
+  <p>The notebook uses <code>gpt-4.1-nano</code> at temperature 1.0 — a small, somewhat unreliable model, not the best one available. That's deliberate. If the policy got every problem right, every sample would look identical to the verifier: all correct, no contrast. A referee only tells you something useful when there's a real chance of a foul.</p>
+
+  <div class="visual">
+    <p class="visual-label">Code — Task 1: the policy</p>
+    <pre><code>MODEL = "gpt-4.1-nano"  # small on purpose: we *want* some wrong answers
+
+def simple_complete(prompt: str, system: str = "", temperature: float = 1.0) -> str:
+    """One completion from the policy model."""
+    ...
+    return response.choices[0].message.content</code></pre>
+  </div>
+  <p class="visual-caption"><code>def simple_complete(...)</code> is a function: give it a prompt, it gives back one piece of text from the model. <code>temperature: float = 1.0</code> means "the temperature argument is a decimal number, and if nobody passes one in, use 1.0 (maximum randomness)."</p>
+
+  <h3>2. Ground truth + the <code>\boxed&#123;&#125;</code> convention makes checking mechanical</h3>
+  <p>Each problem carries its correct answer as a plain string, and the policy is instructed to wrap its final answer in <code>\boxed&#123;...&#125;</code> — the exact convention GSM8K-style training uses, which you already saw feeding Session 15's reward function. That turns "did the model get it right?" from a judgment call into a regex search.</p>
+
+  <div class="visual">
+    <p class="visual-label">Code — Task 2: the problem and the extractor</p>
+    <pre><code>@dataclass
+class Problem:
+    question: str
+    answer: str  # ground truth
+
+def extract_number(text: str) -> str:
+    r"""Pull the final answer out of a completion: \boxed{...} first, last number as fallback."""
+    boxed = re.search(r"\\boxed\{([^}]+)\}", text)
+    if boxed:
+        return boxed.group(1).strip()
+    numbers = re.findall(r"-?\d+\.?\d*", text)
+    return numbers[-1] if numbers else ""</code></pre>
+  </div>
+
+  <div class="box callout">
+    <span class="box-label">Python patterns you'll see here</span>
+    <code>@dataclass</code> auto-generates a simple container class from the fields you list — <code>Problem("What is 12*13?", "156")</code> just works, no boilerplate <code>__init__</code>. <code>re.search(pattern, text)</code> finds the <em>first</em> match of a regex pattern and returns it (or <code>None</code>); <code>re.findall(...)</code> returns <em>all</em> matches as a list. The <code>r"..."</code> prefix is a "raw string" — it tells Python not to treat <code>\b</code> as a special escape code, so the regex engine sees the literal backslash it needs to match <code>\boxed</code>.
+  </div>
+
+  <h2>Trace one real problem through the extractor</h2>
+  <p>Problem 1 from the notebook: <em>"What is 12 * 13?"</em>, ground truth <code>"156"</code>. Watch the same text move through each stage.</p>
+
+  <div class="visual">
+    <p class="visual-label">Worked example — before → during → after</p>
+    <div style="display:flex; flex-direction:column; gap:0.7rem;">
+      <div class="box callout"><span class="box-label">1. Policy's raw completion</span>Step 1: 12*13 = 156. The answer is <code>\boxed&#123;156&#125;</code>.</div>
+      <div class="box callout"><span class="box-label">2. Regex runs: <code>re.search(r"\\boxed\{([^}]+)\}", text)</code></span>Pattern looks for the literal text <code>\boxed&#123;</code>, then captures everything up to the next <code>&#125;</code>. It finds a match.</div>
+      <div class="box callout"><span class="box-label">3. <code>extracted = boxed.group(1).strip()</code></span><code>extracted = "156"</code></div>
+      <div class="box analogy"><span class="box-label">4. Compare to ground truth</span><code>"156" == "156"</code> → verified correct. This is now a checkable fact, not an opinion.</div>
+    </div>
+  </div>
+  <p class="visual-caption">If the model had instead written just "the speed is 80 km/h" with no box (the notebook's second test case), <code>re.search</code> would find nothing, and the function falls back to <code>re.findall</code> — grabbing the last plain number in the text as a best guess.</p>
+
+  <div class="box citation">
+    <span class="box-label">Where this lives in your notebook</span>
+    <code>01_RLVR_Verifiable_Rewards.ipynb</code>, Task 1 (the policy, cell defining <code>simple_complete</code>) and Task 2 (<code>Problem</code>, <code>extract_number</code>, and the five sample problems). The three <code>assert</code> lines right after <code>extract_number</code> are tests — each one runs the function and crashes the notebook loudly if the output doesn't match what's expected, which is how you know the extractor actually works before trusting it.
+  </div>
+
+  <div class="ask-agent">
+    💬 Confused by anything above? Ask your teaching agent. Try: "what would extract_number return for a completion with two boxed answers?"
+  </div>
+
+  <div class="lesson-nav">
+    <a href="0000-big-picture.html">← Big Picture</a>
+    <a href="0002-reward-function-design.html">Next: Reward Function Design →</a>
+  </div>
+</div>
+<script src="../assets/interactions.js"></script>

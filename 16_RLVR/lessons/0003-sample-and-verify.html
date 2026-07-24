@@ -1,0 +1,102 @@
+<title>Sample and Verify — RLVR</title>
+<link rel="stylesheet" href="../assets/base.css">
+<div class="page">
+
+  <div class="crumbs"><a href="index.html">All lessons</a> · <a href="0002-reward-function-design.html">← Reward Function Design</a></div>
+
+  <p class="kicker">Lesson 0003 · Sample and Verify</p>
+  <h1>One Shooter, Four Free Throws, One Referee</h1>
+
+  <div class="box analogy">
+    <span class="box-label">Analogy first — same shooter you met in Session 15</span>
+    Remember: GRPO didn't judge one free throw in isolation. It had the same shooter take a whole group of shots at the same hoop, then compared each shot to <em>that group's own average</em>. This lesson builds the referee's half of that: the same policy answers the same question <code>n_samples</code> times, and the verifier calls each attempt in or out — building the exact group your GRPO training consumed in Session 15.
+  </div>
+
+  <h2>The code: one problem in, a group of verified samples out</h2>
+
+  <div class="visual">
+    <p class="visual-label">Code — Task 4: sampling and verifying a group</p>
+    <pre><code>@dataclass
+class Sample:
+    problem: str
+    response: str
+    extracted: str
+    reward: float
+    verified_correct: bool
+
+def sample_and_verify(problem: Problem, n_samples: int = 4) -> list[Sample]:
+    """Sample a group of completions for one problem and verify each one."""
+    group = []
+    for _ in range(n_samples):
+        response = simple_complete(
+            f"Solve step by step. Put the final numeric answer in \\boxed{{}}.\n\n{problem.question}",
+            system="You are a careful mathematician. Show your work, then box the final number.",
+        )
+        extracted = extract_number(response)
+        reward = reward_fn.compute(response, problem.answer)
+        group.append(Sample(problem=problem.question, response=response,
+                             extracted=extracted, reward=reward,
+                             verified_correct=reward > 0))
+    return group
+
+groups = [sample_and_verify(p) for p in problems]</code></pre>
+  </div>
+
+  <div class="box callout">
+    <span class="box-label">Python patterns you'll see here</span>
+    <code>for _ in range(n_samples):</code> — the underscore is a throwaway variable name, used when you need to repeat something a fixed number of times but never actually use the loop counter. <code>groups = [sample_and_verify(p) for p in problems]</code> is a list comprehension: run <code>sample_and_verify</code> once per problem, collect all the results into one list — five problems in, five groups out.
+  </div>
+
+  <h2>Worked example — one group, four attempts, one referee</h2>
+  <p>Picture <code>sample_and_verify</code> called on Problem 1 (<em>"What is 12 * 13?"</em>, ground truth <code>"156"</code>) with <code>n_samples=4</code>. The same policy answers the same question four separate times, at temperature 1.0 — so the four answers won't all be identical.</p>
+
+  <div class="visual">
+    <p class="visual-label">Illustration — one group, verified</p>
+    <div style="display:flex; gap:0.6rem; flex-wrap:wrap;">
+      <div class="box" style="background:var(--good-soft); border:1px solid var(--good); flex:1; min-width:140px;">
+        <span class="box-label" style="color:var(--good);">Sample 1</span>
+        extracted "156" → <strong>reward +1.0</strong>
+      </div>
+      <div class="box" style="background:var(--good-soft); border:1px solid var(--good); flex:1; min-width:140px;">
+        <span class="box-label" style="color:var(--good);">Sample 2</span>
+        extracted "156" → <strong>reward +1.0</strong>
+      </div>
+      <div class="box" style="background:var(--bad-soft); border:1px solid var(--bad); flex:1; min-width:140px;">
+        <span class="box-label" style="color:var(--bad);">Sample 3</span>
+        extracted "165" (arithmetic slip) → <strong>reward −0.1</strong>
+      </div>
+      <div class="box" style="background:var(--good-soft); border:1px solid var(--good); flex:1; min-width:140px;">
+        <span class="box-label" style="color:var(--good);">Sample 4</span>
+        extracted "156" → <strong>reward +1.0</strong>
+      </div>
+    </div>
+  </div>
+  <p class="visual-caption">3 out of 4 verified correct for this group. This is the exact same shape of group GRPO averaged over in Session 15 — except last time the reward function was handed to you; this time you built the referee that produced these four numbers yourself.</p>
+
+  <h2>Why the group matters — twice</h2>
+  <div class="compare">
+    <div class="col yes">
+      <h4>Reason 1 — GRPO already needs this</h4>
+      GRPO computes each sample's <em>advantage</em> relative to its group's average reward. This <code>groups</code> list is exactly that structure: one list of scored attempts per prompt.
+    </div>
+    <div class="col yes">
+      <h4>Reason 2 — new this session</h4>
+      A group with both correct and incorrect samples is raw material for a <strong>preference pair</strong>: sample 1 or 2 as "chosen," sample 3 as "rejected." No contrast, no pair. Lesson 0006 builds this.
+    </div>
+  </div>
+
+  <div class="box citation">
+    <span class="box-label">Where this lives in your notebook</span>
+    Task 4, plus the note right after it: <em>"If your verified-correct rate is 100%, the contrast that drives learning is missing."</em> That's not a throwaway warning — a group with no failures is useless for both GRPO (every advantage is roughly zero, nothing to push the policy toward) and for preference pairs (Reason 2 above needs at least one rejected sample per group). The notebook also has you read one rejected completion directly — that's the fastest way to learn what your policy is actually getting wrong: arithmetic, misread units, or bad formatting.
+  </div>
+
+  <div class="ask-agent">
+    💬 Confused by anything above? Ask your teaching agent. Try: "what would go wrong if n_samples were 1 instead of 4?"
+  </div>
+
+  <div class="lesson-nav">
+    <a href="0002-reward-function-design.html">← Reward Function Design</a>
+    <a href="0004-reward-hacking.html">Next: Reward Hacking →</a>
+  </div>
+</div>
+<script src="../assets/interactions.js"></script>

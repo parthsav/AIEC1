@@ -1,0 +1,93 @@
+<title>Preference Pairs — RLVR</title>
+<link rel="stylesheet" href="../assets/base.css">
+<div class="page">
+
+  <div class="crumbs"><a href="index.html">All lessons</a> · <a href="0005-code-verifier.html">← The Code Verifier</a></div>
+
+  <p class="kicker">Lesson 0006 · Preference Pairs</p>
+  <h1>Same Verdicts, Two Different Lesson Plans</h1>
+
+  <div class="box analogy">
+    <span class="box-label">Analogy first</span>
+    A coach who watched the same shooter take a group of free throws could teach two different ways. Way one: tell the shooter their <em>average</em> for that round, and let them adjust — that's what Session 15's GRPO did with the group average. Way two: pull out one good shot and one bad shot from the exact same round, put them side by side, and say "do more of this, less of that" — a direct, paired comparison. Way two is a <strong>preference pair</strong>, and it's what this lesson builds.
+  </div>
+
+  <p>Everything so far — the policy, the verifier, the audit trail — has been building toward one question: what do you actually <em>do</em> with a pile of verified, audited samples? The answer is: two different things, from the exact same data.</p>
+
+  <h2>Building a pair: winners cross losers, within a group</h2>
+
+  <div class="visual">
+    <p class="visual-label">Code — Task 7: preference pairs</p>
+    <pre><code>def build_preferences(groups: list[list[Sample]], records: list[dict]) -> list[dict]:
+    """Cross verified-correct (unflagged) winners with incorrect losers, per group."""
+    flagged_responses = {r["response"] for r in records if r["suspected_hack"]}
+    pairs = []
+    for group in groups:
+        winners = [s for s in group if s.verified_correct and s.response not in flagged_responses]
+        losers = [s for s in group if not s.verified_correct]
+        pairs.extend(
+            {"prompt": winner.problem, "chosen": winner.response, "rejected": loser.response}
+            for winner in winners
+            for loser in losers
+        )
+    return pairs</code></pre>
+  </div>
+
+  <div class="box callout">
+    <span class="box-label">Python patterns you'll see here</span>
+    <code>{r["response"] for r in records if r["suspected_hack"]}</code> is a <strong>set</strong> comprehension (curly braces, no key:value) — a fast lookup table of every hack-suspect response text. The nested generator inside <code>pairs.extend(...)</code> is a double loop written inline: for every <code>winner</code>, for every <code>loser</code>, build one pair — this is the "cross product" mentioned in the notebook, and it's why one group of 4 with 2 winners and 1 loser produces 2 pairs, not 3.
+  </div>
+
+  <h2>Worked example — one group becomes two pairs</h2>
+  <p>Recall the group from Lesson 0003: 3 correct, 1 incorrect. Now suppose one of those 3 "correct" samples got flagged by Lesson 0004's hack detector.</p>
+
+  <div class="visual">
+    <div style="display:flex; flex-direction:column; gap:0.5rem;">
+      <div class="box" style="background:var(--good-soft); border:1px solid var(--good);"><span class="box-label" style="color:var(--good);">Sample 1 — winner</span>Correct, not flagged → eligible as <strong>chosen</strong></div>
+      <div class="box" style="background:var(--good-soft); border:1px solid var(--good);"><span class="box-label" style="color:var(--good);">Sample 2 — winner</span>Correct, not flagged → eligible as <strong>chosen</strong></div>
+      <div class="box" style="background:var(--accent-soft); border-left:4px solid var(--accent);"><span class="box-label" style="color:var(--accent);">Sample 3 — excluded</span>Correct, <em>but flagged as hack-suspect</em> → NOT eligible as chosen, and not a loser either. Simply dropped.</div>
+      <div class="box" style="background:var(--bad-soft); border:1px solid var(--bad);"><span class="box-label" style="color:var(--bad);">Sample 4 — loser</span>Incorrect → eligible as <strong>rejected</strong></div>
+    </div>
+    <p class="visual-caption">2 winners × 1 loser = <strong>2 pairs</strong>: (Sample 1 chosen, Sample 4 rejected) and (Sample 2 chosen, Sample 4 rejected). Sample 3 contributes to neither — if a hack-suspect response were allowed as "chosen," the next policy iteration would be directly taught to hack more, which is exactly the failure mode Lesson 0004 exists to prevent.</p>
+  </div>
+
+  <h2>Same verifier, two consumers</h2>
+  <div class="compare">
+    <div class="col yes">
+      <h4>DPO (new this session)</h4>
+      Consumes <code>{prompt, chosen, rejected}</code> pairs directly — no RL rollout during training, just "make chosen more likely than rejected." This is exactly the schema <a href="https://huggingface.co/docs/trl/main/en/dpo_trainer" target="_blank" rel="noopener">TRL's <code>DPOTrainer</code></a> expects.
+    </div>
+    <div class="col yes">
+      <h4>GRPO (Session 15)</h4>
+      Skips the pairing entirely and uses each sample's raw reward, compared to its group's average — the loop you already trained against in Session 15.
+    </div>
+  </div>
+  <p>Both start from the identical thing: a verified, audited group of samples. The only difference is what you do with it next.</p>
+
+  <h2>What we built, start to finish</h2>
+  <ol>
+    <li><strong>A policy</strong> — small, sampled at temperature 1.0, deliberately sometimes wrong (Lesson 0001)</li>
+    <li><strong>A verifiable domain</strong> — math with ground truth + <code>\boxed&#123;&#125;</code> (Lesson 0001)</li>
+    <li><strong>A reward function</strong> — deterministic, normalized, asymmetric (Lesson 0002)</li>
+    <li><strong>The sampling loop</strong> — groups, the same structure GRPO needed (Lesson 0003)</li>
+    <li><strong>Adversarial thinking</strong> — hack detection, an append-only audit trail (Lesson 0004)</li>
+    <li><strong>A second domain</strong> — code judged by unit tests, fractional rewards (Lesson 0005)</li>
+    <li><strong>Training data</strong> — audited samples become preference pairs, hack-suspects excluded (this lesson)</li>
+  </ol>
+  <p>The one idea underneath all seven steps: <strong>wherever a deterministic program can check correctness, cheap inference becomes training signal</strong> — no human labelers, no learned reward model. The verifier's quality is the ceiling on the policy's quality.</p>
+
+  <div class="box citation">
+    <span class="box-label">Now go do the notebook's Activity #1 yourself</span>
+    Pick a third verifiable domain — JSON schema conformance, SQL correctness against a reference database, or a deterministic string transformation — and build a reward function, run the sample-and-verify loop on at least 3 prompts, and report the verified-correct rate. Every piece of machinery you need (a <code>Problem</code>-like structure, a reward function with a <code>.compute()</code> method, <code>sample_and_verify</code>) already exists in the notebook above this activity — the activity is choosing what "correct" means for your domain and writing the check.
+  </div>
+
+  <div class="ask-agent">
+    💬 Confused by anything above, or stuck on Activity #1? Ask your teaching agent. Try: "help me design a verifier for [my domain idea]."
+  </div>
+
+  <div class="lesson-nav">
+    <a href="0005-code-verifier.html">← The Code Verifier</a>
+    <span>You've reached the end — go finish the notebook.</span>
+  </div>
+</div>
+<script src="../assets/interactions.js"></script>

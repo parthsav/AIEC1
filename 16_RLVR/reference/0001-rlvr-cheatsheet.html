@@ -1,0 +1,66 @@
+<title>RLVR Cheat Sheet</title>
+<link rel="stylesheet" href="../assets/base.css">
+<div class="page">
+  <div class="crumbs"><a href="../lessons/index.html">← All lessons</a></div>
+  <p class="kicker">Reference · Quick Lookup</p>
+  <h1>RLVR (Verifiable Rewards) Cheat Sheet</h1>
+  <p>The compressed version of Lessons 0000–0006. Use this mid-notebook when you need a fast reminder, not a first explanation — for that, go back to the lessons.</p>
+
+  <h2>The loop, in one line</h2>
+  <pre>prompt → sample N completions → verify each against a deterministic checker
+       → assign rewards → keep verified-correct (unflagged) as preference data
+       → policy update (DPO or GRPO) → repeat</pre>
+
+  <h2>Glossary</h2>
+  <table>
+    <tr><th>Term</th><th>Compressed definition</th></tr>
+    <tr><td><strong>Verifier</strong></td><td>A deterministic program that checks correctness — exact match, unit test, schema validation. No training, no judgment call.</td></tr>
+    <tr><td><strong>Verifiable reward</strong></td><td>A reward computed by a verifier rather than a human or a learned reward model. RLVR = RL where every reward comes from one of these.</td></tr>
+    <tr><td><strong>Learned reward model</strong></td><td>RLHF's approach: a network trained to imitate human preference rankings. Approximate, itself gameable — the thing RLVR replaces.</td></tr>
+    <tr><td><strong>Policy</strong></td><td>The model being sampled from — same meaning as Session 15. Here: a small API model on purpose, so it's sometimes wrong.</td></tr>
+    <tr><td><strong>Ground truth</strong></td><td>The known-correct answer a verifier checks a completion against.</td></tr>
+    <tr><td><strong>Group</strong></td><td>N completions sampled for the same prompt. Same structure GRPO averaged over in Session 15; also the source of correct/incorrect contrast for preference pairs.</td></tr>
+    <tr><td><strong>Reward hacking</strong></td><td>A policy exploiting a verifier's blind spots to score well without actually solving the task. See Goodhart's law.</td></tr>
+    <tr><td><strong>Goodhart's law</strong></td><td>"When a measure becomes a target, it ceases to be a good measure." Training against a verifier makes the verifier the objective.</td></tr>
+    <tr><td><strong>Audit trail</strong></td><td>An append-only log (<code>verifier.jsonl</code>) of every verifier decision — the record that answers "was this trained on honest rewards?"</td></tr>
+    <tr><td><strong>Preference pair</strong></td><td>A <code>&#123;prompt, chosen, rejected&#125;</code> record built from a group's winner and loser. Feeds DPO-style trainers.</td></tr>
+    <tr><td><strong>Sandbox</strong></td><td>An isolated, disposable execution environment (Firecracker microVM, gVisor, container) for running untrusted code — the real production version of Task 6's bare <code>subprocess</code>.</td></tr>
+  </table>
+
+  <h2>RLHF vs. RLVR</h2>
+  <table>
+    <tr><th></th><th>RLHF</th><th>RLVR</th></tr>
+    <tr><td>Reward source</td><td>A learned reward model, trained on human preference rankings</td><td>A deterministic verifier — exact match, unit tests, schema check</td></tr>
+    <tr><td>Cost per reward</td><td>A forward pass through a trained network</td><td>Running a check — usually cheaper, always reproducible</td></tr>
+    <tr><td>Works when...</td><td>"Correct" is a matter of taste (persuasiveness, tone, helpfulness)</td><td>"Correct" is checkable by a program (math, code, structured data)</td></tr>
+  </table>
+
+  <h2>Math verifier vs. code verifier</h2>
+  <table>
+    <tr><th></th><th>Math (Task 3)</th><th>Code (Task 6)</th></tr>
+    <tr><td>Reward shape</td><td>Binary: +1.0 correct / −0.1 incorrect (asymmetric)</td><td>Fractional: tests passed ÷ tests total, in [0.0, 1.0]</td></tr>
+    <tr><td>Check mechanism</td><td>Regex-extracted <code>\boxed&#123;&#125;</code> vs. ground truth, numerically normalized</td><td>Execute in a subprocess, compare stdout to expected</td></tr>
+    <tr><td>Main risk</td><td>Brittle extraction punishes correct reasoning; guessing/leakage hacks</td><td>Untrusted code execution — a security boundary, not just a check</td></tr>
+  </table>
+
+  <h2>Why the reward is asymmetric (+1.0 / −0.1)</h2>
+  <p>Early in training most attempts fail. A harsh symmetric penalty (−1.0) makes "genuine attempt, wrong" and "no real attempt at all" score identically — nothing separates trying from giving up. A small penalty keeps that distinction alive in the signal.</p>
+
+  <h2>Building a preference pair (Task 7)</h2>
+  <pre>winners = verified-correct samples NOT flagged as hack-suspect
+losers  = verified-incorrect samples
+pairs   = every (winner, loser) combination within the same group</pre>
+  <p>Hack-suspect samples are excluded from winners — using one as "chosen" would teach the next policy iteration to hack more.</p>
+
+  <h2>Same verified data, two consumers</h2>
+  <table>
+    <tr><th></th><th>DPO</th><th>GRPO (Session 15)</th></tr>
+    <tr><td>Input shape</td><td><code>&#123;prompt, chosen, rejected&#125;</code> pairs</td><td>Raw reward per sample, compared to group mean</td></tr>
+    <tr><td>Needs pairing?</td><td>Yes</td><td>No — uses the group directly</td></tr>
+  </table>
+
+  <h2>What's different in production</h2>
+  <p>Sandboxed execution (not a bare subprocess) · async/batched sampling at scale, not sequential API calls · verifier hardening (symbolic math checkers, hidden held-out test cases) · governance (versioned audit logs, drift dashboards) · the loop repeats against the updated policy each iteration — this notebook is one lap of that flywheel.</p>
+
+  <p style="margin-top:2rem;"><a href="../lessons/index.html">← Back to lessons</a> if any of these need the full explanation again.</p>
+</div>

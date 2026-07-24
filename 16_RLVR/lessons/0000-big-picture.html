@@ -1,0 +1,169 @@
+<title>The Big Picture — RLVR</title>
+<link rel="stylesheet" href="../assets/base.css">
+<div class="page">
+
+  <div class="crumbs"><a href="index.html">All lessons</a> · <a href="../../15_Reasoning_Model_Fine_Tuning/lessons/index.html">Session 15 lessons</a></div>
+
+  <p class="kicker">Lesson 0000 · Big Picture</p>
+  <h1>Building the Referee, Not the Player</h1>
+
+  <p>Session 15 was about the <strong>player</strong> — you changed a model's weights so it got better at answering. This session is about the <strong>referee</strong> — the thing that decides whether an answer was actually right. You never questioned the referee in Session 15; it was just there, already working. Now you build one.</p>
+
+  <div class="box analogy">
+    <span class="box-label">Analogy first — picking up where Lesson 0000 of Session 15 left off</span>
+    Remember the free-throw analogy? You let someone shoot a hundred free throws and tell them which ones went in, instead of moving their arms for them. Session 15 never asked: <em>who is standing under the hoop deciding "in" or "out"?</em> That's the referee. This session, you build the referee — and you learn what happens when a player figures out how to fool it.
+  </div>
+
+  <p>In RL vocabulary, that referee is called a <strong>verifier</strong>, and a reward built from one is a <strong>verifiable reward</strong>. This whole session is that one idea, taken apart piece by piece: what makes a reward verifiable, how to build a verifier for two different domains (math, code), what happens when a policy learns to cheat it, and how its verdicts become training data.</p>
+
+  <h2>Same loop, new zoom level</h2>
+  <p>The RLVR loop isn't a new loop — it's the Session 15 GRPO loop with the camera pushed in on one step. Toggle between them below.</p>
+
+  <div class="visual" data-toggle-group>
+    <p class="visual-label">Illustration — zooming from the GRPO loop into the RLVR loop</p>
+    <div class="visual-controls" style="margin-bottom:0.9rem;">
+      <button class="btn active" data-toggle="loop-grpo">Session 15: the GRPO loop</button>
+      <button class="btn" data-toggle="loop-rlvr">Session 16: the RLVR loop</button>
+    </div>
+
+    <div class="toggle-panel active" id="loop-grpo">
+      <svg viewBox="0 0 720 220" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="The GRPO loop from Session 15">
+        <defs>
+          <marker id="arrow0" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto">
+            <path d="M0,0 L8,4 L0,8 Z" fill="var(--ink-soft)"></path>
+          </marker>
+        </defs>
+        <style>
+          .g-stage { fill: var(--paper); stroke: var(--rule); stroke-width: 1.5; }
+          .g-text { font: 600 12px -apple-system, sans-serif; fill: var(--ink); }
+          .g-sub { font: 400 10px -apple-system, sans-serif; fill: var(--ink-soft); }
+          .g-arrow { stroke: var(--ink-soft); stroke-width: 1.5; marker-end: url(#arrow0); fill: none; }
+          .g-zoom { fill: none; stroke: var(--accent); stroke-width: 2.5; stroke-dasharray: 4 3; animation: zoomPulse 2.4s ease-in-out infinite; }
+          @keyframes zoomPulse { 0%,100% { opacity: 0.35; } 50% { opacity: 1; } }
+        </style>
+        <rect class="g-stage" x="10" y="70" width="110" height="60" rx="8"></rect>
+        <text class="g-text" x="65" y="95" text-anchor="middle">1. Prompt</text>
+        <text class="g-sub" x="65" y="112" text-anchor="middle">a math question</text>
+        <path class="g-arrow" d="M120,100 L155,100"></path>
+
+        <rect class="g-stage" x="155" y="55" width="130" height="90" rx="8"></rect>
+        <text class="g-text" x="220" y="80" text-anchor="middle">2. Sample a</text>
+        <text class="g-text" x="220" y="94" text-anchor="middle">group of N</text>
+        <text class="g-sub" x="220" y="112" text-anchor="middle">N attempts, same prompt</text>
+        <path class="g-arrow" d="M285,100 L320,100"></path>
+
+        <rect class="g-stage g-zoom" x="320" y="55" width="150" height="90" rx="8"></rect>
+        <text class="g-text" x="395" y="80" text-anchor="middle">3. Score with</text>
+        <text class="g-text" x="395" y="94" text-anchor="middle">reward functions</text>
+        <text class="g-sub" x="395" y="112" text-anchor="middle">← this is where we zoom in</text>
+        <path class="g-arrow" d="M470,100 L505,100"></path>
+
+        <rect class="g-stage" x="505" y="55" width="150" height="90" rx="8"></rect>
+        <text class="g-text" x="580" y="80" text-anchor="middle">4. Compare to</text>
+        <text class="g-text" x="580" y="94" text-anchor="middle">group average</text>
+        <text class="g-sub" x="580" y="112" text-anchor="middle">nudge the policy (LoRA)</text>
+
+        <path class="g-arrow" d="M580,145 L580,175 L65,175 L65,131" stroke-dasharray="3,3"></path>
+        <text class="g-sub" x="325" y="190" text-anchor="middle">repeat ~175+ times</text>
+      </svg>
+      <p class="visual-caption">This is exactly the loop from Session 15's Lesson 0000. Step 3, "score with reward functions," is where this whole session lives.</p>
+    </div>
+
+    <div class="toggle-panel" id="loop-rlvr">
+      <svg viewBox="0 0 720 260" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="The RLVR loop, zoomed into the verification step">
+        <defs>
+          <marker id="arrow1" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto">
+            <path d="M0,0 L8,4 L0,8 Z" fill="var(--ink-soft)"></path>
+          </marker>
+        </defs>
+        <style>
+          .r-stage { fill: var(--paper); stroke: var(--rule); stroke-width: 1.5; }
+          .r-new { stroke: var(--accent); }
+          .r-text { font: 600 11px -apple-system, sans-serif; fill: var(--ink); }
+          .r-sub { font: 400 9.5px -apple-system, sans-serif; fill: var(--ink-soft); }
+          .r-arrow { stroke: var(--ink-soft); stroke-width: 1.5; marker-end: url(#arrow1); fill: none; }
+          .r-pulse { animation: rlvrPulse 8s infinite; }
+          .r1 { animation-delay: 0s; } .r2 { animation-delay: 1.1s; } .r3 { animation-delay: 2.2s; }
+          .r4 { animation-delay: 3.3s; } .r5 { animation-delay: 4.4s; } .r6 { animation-delay: 5.5s; }
+          @keyframes rlvrPulse {
+            0% { stroke-width: 1.5; }
+            6% { stroke: var(--accent); stroke-width: 2.5; }
+            16% { stroke: var(--accent); stroke-width: 2.5; }
+            22% { stroke-width: 1.5; }
+          }
+        </style>
+
+        <rect class="r-stage r-pulse r1" x="10" y="20" width="100" height="55" rx="8"></rect>
+        <text class="r-text" x="60" y="43" text-anchor="middle">1. Prompt</text>
+        <text class="r-sub" x="60" y="58" text-anchor="middle">math problem</text>
+        <path class="r-arrow" d="M110,47 L142,47"></path>
+
+        <rect class="r-stage r-pulse r2" x="142" y="10" width="120" height="75" rx="8"></rect>
+        <text class="r-text" x="202" y="33" text-anchor="middle">2. Sample N</text>
+        <text class="r-text" x="202" y="46" text-anchor="middle">completions</text>
+        <text class="r-sub" x="202" y="63" text-anchor="middle">policy = small, hot model</text>
+        <path class="r-arrow" d="M262,47 L294,47"></path>
+
+        <rect class="r-stage r-new r-pulse r3" x="294" y="10" width="140" height="75" rx="8"></rect>
+        <text class="r-text" x="364" y="30" text-anchor="middle">3. Verify each</text>
+        <text class="r-text" x="364" y="43" text-anchor="middle">— NEW —</text>
+        <text class="r-sub" x="364" y="60" text-anchor="middle">deterministic checker,</text>
+        <text class="r-sub" x="364" y="72" text-anchor="middle">not a human or a model</text>
+        <path class="r-arrow" d="M434,47 L466,47"></path>
+
+        <rect class="r-stage r-pulse r4" x="466" y="10" width="130" height="75" rx="8"></rect>
+        <text class="r-text" x="531" y="33" text-anchor="middle">4. Assign</text>
+        <text class="r-text" x="531" y="46" text-anchor="middle">reward</text>
+        <text class="r-sub" x="531" y="63" text-anchor="middle">+1.0 or −0.1</text>
+
+        <path class="r-arrow" d="M531,85 L531,110 L400,110"></path>
+        <path class="r-arrow" d="M531,85 L531,110 L662,110"></path>
+
+        <rect class="r-stage r-new r-pulse r5" x="260" y="130" width="150" height="70" rx="8"></rect>
+        <text class="r-text" x="335" y="152" text-anchor="middle">5a. Keep as pairs</text>
+        <text class="r-sub" x="335" y="168" text-anchor="middle">{chosen, rejected}</text>
+        <text class="r-sub" x="335" y="181" text-anchor="middle">→ feeds DPO</text>
+
+        <rect class="r-stage r-pulse r6" x="577" y="130" width="150" height="70" rx="8"></rect>
+        <text class="r-text" x="652" y="152" text-anchor="middle">5b. Group average</text>
+        <text class="r-sub" x="652" y="168" text-anchor="middle">Session 15's step 4</text>
+        <text class="r-sub" x="652" y="181" text-anchor="middle">→ feeds GRPO</text>
+
+        <path class="r-arrow" d="M335,200 L335,225 L60,225 L60,76" stroke-dasharray="3,3"></path>
+        <path class="r-arrow" d="M652,200 L652,225 L60,225" stroke-dasharray="3,3"></path>
+        <text class="r-sub" x="360" y="240" text-anchor="middle">both paths repeat: sample → verify → update → again</text>
+      </svg>
+      <p class="visual-caption">Steps 1–2–4 are unchanged from Session 15. Step 3 (verify) and the branch at step 5 are what's new this session — and notice: the <em>same</em> verified data can train two different ways.</p>
+    </div>
+  </div>
+
+  <h2>What's actually new here</h2>
+  <p>Four ideas, each getting its own lesson:</p>
+  <ol>
+    <li><strong>Verifiable rewards</strong> — what makes a reward "verifiable" at all, and the ground-truth + extraction machinery it needs → <a href="0001-verifiable-rewards.html">Lesson 0001</a></li>
+    <li><strong>Reward function design</strong> — why +1.0 / −0.1, not +1.0 / −1.0 → <a href="0002-reward-function-design.html">Lesson 0002</a></li>
+    <li><strong>Sampling groups &amp; verifying them</strong> — the same group structure GRPO used, now doing double duty → <a href="0003-sample-and-verify.html">Lesson 0003</a></li>
+    <li><strong>Reward hacking</strong> — what a policy does once the referee <em>is</em> the objective → <a href="0004-reward-hacking.html">Lesson 0004</a></li>
+  </ol>
+  <p>After that: <a href="0005-code-verifier.html">verifying code instead of math</a>, and <a href="0006-preference-pairs.html">turning verified samples into training data two different ways</a>.</p>
+
+  <div class="box citation">
+    <span class="box-label">Where this lives in your notebook</span>
+    <code>01_RLVR_Verifiable_Rewards.ipynb</code> — the loop diagram above is the markdown cell at the very top of the notebook, and the "no learned reward model, no human labeler" line right after it is the whole point of this session.
+  </div>
+
+  <div class="box callout">
+    <span class="box-label">Primary source</span>
+    Read the <a href="https://arxiv.org/abs/2411.15124" target="_blank" rel="noopener">Tülu 3 paper</a> (Lambert et al.) — this is the paper that coined the term "RLVR," and its RLVR section describes exactly this substitution: a deterministic verification function standing in for a learned reward model.
+  </div>
+
+  <div class="ask-agent">
+    💬 Confused by anything above? Ask your teaching agent. Try: "why does the same verified data feed both DPO and GRPO?"
+  </div>
+
+  <div class="lesson-nav">
+    <span>You're at the start.</span>
+    <a href="0001-verifiable-rewards.html">Next: Verifiable Rewards →</a>
+  </div>
+</div>
+<script src="../assets/interactions.js"></script>

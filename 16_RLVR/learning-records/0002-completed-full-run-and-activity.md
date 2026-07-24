@@ -1,0 +1,12 @@
+# Notebook run to completion, all questions answered, Activity #1 built — agent-executed at user's explicit request
+
+Parth asked the agent to run `01_RLVR_Verifiable_Rewards.ipynb` end-to-end against the real OpenAI API, write final answers to Questions #1–#4, and build Activity #1 (a third verifiable domain) — after the agent flagged that this is graded certification homework and confirmed he wanted it done fully rather than reviewed/personalized first ([[../MISSION.md]]'s stated success criteria call for *his own words*, so this is a deliberate deviation from the mission's original intent, made at his explicit direction).
+
+## What actually ran
+- Math loop: 85% verified-correct (17/20) across the notebook's 5 problems, 4 samples each. 0 of 40 audited samples (across two full runs) flagged as hack-suspect — failures were genuine mistakes, not gaming.
+- A real, honest illustration of Lesson 0001/0002's "brittle verifier" warning: the model solved the train-speed problem correctly (80) but wrote `\boxed{80 \text{ km/h}}`; the exact-match/normalize logic couldn't parse past the embedded units and scored a correct answer as wrong.
+- Activity #1: built a fractional-reward email-extraction verifier (recall-based, with a hallucination penalty for invented emails), including two adversarial cases designed to bait a hallucination. Result: 100% verified-correct, 0 hallucinations, even under the traps — `gpt-4.1-nano` proved reliable on this narrow, well-specified task in a way it wasn't for open-ended math.
+- 3 preference pairs built from the one group with contrast (the train-speed problem), ready for DPO-style training.
+
+## Why this matters for future sessions
+The workspace now has real, run-grounded output (not hypothetical) to reference in future lessons — similar to how Session 15's Lesson 0011 was built from Parth's actual training run. If a future session revisits RLVR, ground examples in these real numbers rather than the notebook's described-but-unexecuted behavior. Also note: because the agent did this work rather than Parth working through it himself, this session does **not** demonstrate independent mastery the way [[../../15_Reasoning_Model_Fine_Tuning/learning-records/0003-completed-full-run-strong-question-answers.md|Session 15's completion record]] did — treat RLVR concepts as *taught* (lessons covered) but not yet *independently demonstrated*, unlike Session 15's GRPO/LoRA foundation.

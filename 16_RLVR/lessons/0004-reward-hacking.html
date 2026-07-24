@@ -1,0 +1,78 @@
+<title>Reward Hacking — RLVR</title>
+<link rel="stylesheet" href="../assets/base.css">
+<div class="page">
+
+  <div class="crumbs"><a href="index.html">All lessons</a> · <a href="0003-sample-and-verify.html">← Sample and Verify</a></div>
+
+  <p class="kicker">Lesson 0004 · Reward Hacking</p>
+  <h1>The Student Who Learned What Gets Checked, Not the Material</h1>
+
+  <div class="box analogy">
+    <span class="box-label">Analogy first</span>
+    A teacher who only checks the final answer at the back of a worksheet — never the work — will, sooner or later, get a student who just copies the answer key. The student isn't learning math; they're learning exactly what the teacher checks and exactly nothing more. The moment you train a policy against a verifier, the verifier stops being a neutral measurement and becomes <strong>the objective</strong> — and any gap between "what the verifier checks" and "what you actually want" is a gap the policy will eventually find.
+  </div>
+
+  <p>This has a name, and the notebook says it directly: <strong>Goodhart's law</strong> — "when a measure becomes a target, it ceases to be a good measure." A policy trained against your <code>\boxed&#123;&#125;</code> exact-match verifier from Lessons 0001–0003 doesn't care about solving math; it cares about whatever gets it a high number from that specific function. If there's a cheaper way to get the number than actually solving the problem, RL will find it, because RL is a search for whatever maximizes reward.</p>
+
+  <h2>One concrete hack signature: a right answer, no visible work</h2>
+  <p>If a policy is copying a number from somewhere (the prompt, a lucky pattern, sheer guessing) rather than reasoning to it, its response tends to be short and thin on real arithmetic — even though the boxed number is correct.</p>
+
+  <div class="visual">
+    <p class="visual-label">Code — Task 5: the hack detector</p>
+    <pre><code>def looks_like_hack(sample: Sample) -> bool:
+    """Flag verified-correct samples that show no work."""
+    if not sample.verified_correct:
+        return False
+    work = sample.response.replace(f"\\boxed{{{sample.extracted}}}", "")
+    numbers_in_work = re.findall(r"-?\d+\.?\d*", work)
+    return len(sample.response.split()) < 20 or len(numbers_in_work) < 2</code></pre>
+  </div>
+
+  <div class="box callout">
+    <span class="box-label">Python patterns you'll see here</span>
+    <code>sample.response.replace(f"\\boxed{{{sample.extracted}}}", "")</code> strips out the boxed answer itself before checking for "real work" — otherwise the boxed number would count as evidence of work. <code>sample.response.split()</code> with no arguments splits on whitespace, so <code>len(...)</code> gives a rough word count. The final line returns <code>True</code> (flag it) if the response is short (fewer than 20 words) <strong>or</strong> has fewer than 2 other numbers in it — either is a sign the "work" is thin.
+  </div>
+
+  <h2>Trace two real completions through the detector</h2>
+  <div class="visual">
+    <div style="display:flex; flex-direction:column; gap:0.6rem;">
+      <div class="box" style="background:var(--good-soft); border:1px solid var(--good);">
+        <span class="box-label" style="color:var(--good);">Genuine attempt — not flagged</span>
+        "Step 1: 12*13 means 12 added to itself 13 times, or 13 rows of 12. 12*10=120, 12*3=36, 120+36=156. \boxed{156}" — verified correct, 20+ words, 4 other numbers in the work. <code>looks_like_hack</code> → <strong>False</strong>.
+      </div>
+      <div class="box" style="background:var(--bad-soft); border:1px solid var(--bad);">
+        <span class="box-label" style="color:var(--bad);">Suspicious — flagged</span>
+        "\boxed{156}" — verified correct, but after stripping the box, there's nothing left. 1 word, 0 other numbers. <code>looks_like_hack</code> → <strong>True</strong>.
+      </div>
+    </div>
+  </div>
+  <p class="visual-caption">Same reward (+1.0) for both. Only the audit trail tells them apart — the reward number alone can't.</p>
+
+  <h2>The audit trail: every verdict, written down, forever</h2>
+  <p>Every sample gets logged to <code>artifacts/verifier.jsonl</code> — one JSON line per sample, appended, never overwritten. Not just the flagged ones; <em>everything</em>, so someone can later ask "was this run trained on honest rewards?" and get a real answer instead of a shrug.</p>
+
+  <div class="visual">
+    <pre><code>def audit_record(sample: Sample) -> dict:
+    """Append one verifier decision to the audit trail and return it."""
+    record = {**asdict(sample), "suspected_hack": looks_like_hack(sample)}
+    with AUDIT_LOG.open("a") as f:
+        f.write(json.dumps(record) + "\n")
+    return record</code></pre>
+  </div>
+  <p class="visual-caption"><code>{**asdict(sample), "suspected_hack": ...}</code> takes the <code>Sample</code> dataclass, converts it to a plain dictionary with <code>asdict</code>, then spreads (<code>**</code>) all its fields into a new dictionary with one extra key added. <code>.open("a")</code> opens the file in <strong>append</strong> mode — every call adds a new line, nothing already written is ever touched.</p>
+
+  <div class="box citation">
+    <span class="box-label">Now think about Question #3 yourself</span>
+    The detector above catches exactly one signature: "right answer, no visible work." The notebook asks for <strong>two other ways</strong> a policy could hack this specific verifier, and how you'd harden against each. Two directions worth pushing on: what if the ground-truth number happens to already appear somewhere in the question text itself — could a policy just copy any number it sees without solving anything? And what if a completion contains more than one <code>\boxed&#123;&#125;</code> — which one does <code>re.search</code> actually grab, and could that be exploited? The notebook explicitly points at Session 15's <em>stacked format rewards</em> (multiple reward functions added together, not just one) as one relevant hardening pattern — think about what a second, independent check could catch that this one misses.
+  </div>
+
+  <div class="ask-agent">
+    💬 Confused by anything above? Ask your teaching agent. Try: "why does the detector check word count AND number count, not just one?"
+  </div>
+
+  <div class="lesson-nav">
+    <a href="0003-sample-and-verify.html">← Sample and Verify</a>
+    <a href="0005-code-verifier.html">Next: The Code Verifier →</a>
+  </div>
+</div>
+<script src="../assets/interactions.js"></script>

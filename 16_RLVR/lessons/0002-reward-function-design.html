@@ -1,0 +1,90 @@
+<title>Reward Function Design — RLVR</title>
+<link rel="stylesheet" href="../assets/base.css">
+<div class="page">
+
+  <div class="crumbs"><a href="index.html">All lessons</a> · <a href="0001-verifiable-rewards.html">← Verifiable Rewards</a></div>
+
+  <p class="kicker">Lesson 0002 · Reward Function Design</p>
+  <h1>Grading on a Curve That Doesn't Punish You Into Silence</h1>
+
+  <div class="box analogy">
+    <span class="box-label">Analogy first</span>
+    Some standardized tests use "negative marking": +1 for a right answer, and a small deduction like −0.25 for a wrong one, with blank answers scoring 0. The deduction is small on purpose — big enough to discourage wild guessing, but small enough that a student who's genuinely trying still comes out ahead of one who leaves everything blank. This notebook's reward function makes the exact same design choice.
+  </div>
+
+  <h2>The reward function turns "verified" into a number</h2>
+  <p>Lesson 0001 built the referee's rulebook — the extractor and the ground-truth comparison. This lesson is about the <em>score</em> the referee hands back once it's made a call.</p>
+
+  <div class="visual">
+    <p class="visual-label">Code — Task 3: the math reward function</p>
+    <pre><code>class MathRewardFunction:
+    """Verifiable reward for math problems: exact answer match against ground truth."""
+
+    correct_reward = 1.0
+    incorrect_penalty = -0.1
+
+    def compute(self, response: str, ground_truth: str) -> float:
+        prediction = extract_number(response)
+        if self._normalize(prediction) == self._normalize(ground_truth):
+            return self.correct_reward
+        return self.incorrect_penalty
+
+    @staticmethod
+    def _normalize(value: str):
+        """Compare numerically when possible, so '80' == '80.0'."""
+        try:
+            return float(value)
+        except ValueError:
+            return value.strip()</code></pre>
+  </div>
+
+  <div class="box callout">
+    <span class="box-label">Python patterns you'll see here</span>
+    <code>correct_reward = 1.0</code> sitting directly inside the class (not inside a method) is a <strong>class attribute</strong> — every instance of <code>MathRewardFunction</code> shares the same value unless overridden. <code>@staticmethod</code> marks a method that doesn't need <code>self</code> — it's just a plain function that happens to live inside the class for organization. <code>try: ... except ValueError:</code> attempts <code>float(value)</code> and, if the string isn't a valid number (like <code>""</code> when nothing was extracted), falls back to comparing the raw text instead of crashing.
+  </div>
+
+  <h2>Trace three real calls</h2>
+  <p>These are the exact three <code>assert</code> lines from the notebook — each one is a mini worked example.</p>
+
+  <div class="visual">
+    <div style="display:flex; flex-direction:column; gap:0.6rem;">
+      <div class="box analogy"><span class="box-label">Call 1</span><code>reward_fn.compute(r"The speed is \boxed{80}", "80.0")</code> → extracts <code>"80"</code>, normalizes both to the float <code>80.0</code>, they match → <strong>1.0</strong></div>
+      <div class="box callout"><span class="box-label">Call 2</span><code>reward_fn.compute(r"The speed is \boxed{81}", "80")</code> → extracts <code>"81"</code>, <code>81.0 != 80.0</code> → <strong>−0.1</strong></div>
+      <div class="box callout"><span class="box-label">Call 3</span><code>reward_fn.compute("I cannot solve this.", "80")</code> → no box, no fallback number found → extracts <code>""</code> → <code>"" != 80.0</code> → <strong>−0.1</strong></div>
+    </div>
+  </div>
+  <p class="visual-caption">Notice Call 1: without <code>_normalize</code>, the strings <code>"80"</code> and <code>"80.0"</code> would <em>not</em> be equal, and a genuinely correct answer would get punished purely for formatting. A brittle verifier corrupts the signal it's supposed to protect.</p>
+
+  <h2>Why not −1.0? The asymmetry is load-bearing</h2>
+  <p>Go back to the negative-marking analogy. Imagine the deduction for a wrong answer were as large as the reward for a right one (−1.0 instead of −0.1). Early in training the policy is wrong <em>most</em> of the time — that's normal, it hasn't learned anything yet. Under a harsh −1.0 penalty, "gave a real, careful, wrong answer" and "produced total nonsense" score exactly the same. Under the gentle −0.1 penalty, a genuine attempt that happens to be wrong lands close to zero — nowhere near as punishing as it could be.</p>
+
+  <div class="box citation">
+    <span class="box-label">Now think about Question #2 yourself</span>
+    The notebook asks: with a −1.0 penalty, what might a struggling policy learn to do instead of trying? Use the negative-marking analogy above — what does a test-taker do when a wrong answer costs exactly as much as any other kind of non-answer? Write your answer in the notebook in your own words before moving on.
+  </div>
+
+  <h2>Question #1 — verifiable vs. learned reward, one example each</h2>
+  <p>Lesson 0001 already gave you the core contrast: a verifiable reward comes from a deterministic program, a learned reward model comes from a network trained to imitate human judgment. The notebook's Question #1 asks you to go one step further: name one task where a verifiable reward genuinely exists, and one where it fundamentally can't.</p>
+
+  <div class="compare">
+    <div class="col yes">
+      <h4>Verifiable reward exists</h4>
+      Anything with a checkable ground truth: this notebook's math problems, code judged by unit tests (Lesson 0005), SQL queries checked against a reference database, JSON checked against a schema.
+    </div>
+    <div class="col no">
+      <h4>Fundamentally can't be verified</h4>
+      Anything where "correct" is a matter of taste with no ground truth to check against: is this poem moving? Is this marketing copy persuasive? Is this joke funny? No program can settle it — only human (or human-trained) judgment can, which is exactly why RLHF's learned reward model exists for these cases.
+    </div>
+  </div>
+  <p>Try writing your own second example for each column before answering Question #1 in the notebook — it's worth having more than the notebook's own examples in your own words.</p>
+
+  <div class="ask-agent">
+    💬 Confused by anything above? Ask your teaching agent. Try: "why does _normalize fall back to comparing raw strings instead of crashing?"
+  </div>
+
+  <div class="lesson-nav">
+    <a href="0001-verifiable-rewards.html">← Verifiable Rewards</a>
+    <a href="0003-sample-and-verify.html">Next: Sample and Verify →</a>
+  </div>
+</div>
+<script src="../assets/interactions.js"></script>
