@@ -1,0 +1,134 @@
+<title>Why This Matters — Reasoning Model Fine-Tuning</title>
+<link rel="stylesheet" href="../assets/base.css">
+<div class="page">
+
+  <div class="crumbs"><a href="index.html">All lessons</a> · <a href="0006-training-and-results.html">← Training &amp; Results</a> · <a href="../reference/0001-grpo-cheatsheet.html">Cheat sheet</a></div>
+
+  <p class="kicker">Lesson 0007 · Why This Matters</p>
+  <h1>From Math Homework to Any Checkable Task</h1>
+
+  <p>Lessons 0003–0006 explained the <em>mechanism</em> — reward, group sampling, the KL leash, watching reward climb. This lesson steps back: what is all of that actually <em>for</em>, and what can you build once you understand it?</p>
+
+  <div class="box analogy">
+    <span class="box-label">Analogy first (a callback to Lesson 3)</span>
+    Some skills you teach by showing steps — a recipe you follow exactly. Other skills you can only teach by <em>tasting the result</em> and saying "better" or "worse" — you couldn't write down the perfect rule if you tried, but you can always score an attempt. Math reasoning is in that second bucket: nobody wants to hand-write a million correct reasoning traces, but checking a final number is nearly free. <strong>That gap — checking is easy, demonstrating is hard — is exactly when this whole recipe earns its keep.</strong>
+  </div>
+
+  <h2>The one-sentence goal of everything you just learned</h2>
+  <p>Take a model that can already <em>attempt</em> a task, write a function that scores an attempt (even roughly), and use GRPO to make it specifically better at that task — without ever needing a big labeled dataset of "how to do it right."</p>
+
+  <div class="visual">
+    <p class="visual-label">Illustration — the same recipe, two different tasks</p>
+    <svg viewBox="0 0 680 320" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="The same recipe of base model, reward function, and GRPO loop applied to both GSM8K math and a guitar tab transcription idea">
+      <style>
+        .recipe { fill: var(--accent-soft); stroke: var(--accent); stroke-width: 1.5; }
+        .t { font: 600 12px -apple-system, sans-serif; fill: var(--ink); }
+        .s { font: 400 10px -apple-system, sans-serif; fill: var(--ink-soft); }
+        .trackA { fill: var(--paper-raised); stroke: var(--rule); stroke-width: 1.3; }
+        .trackB { fill: var(--good-soft); stroke: var(--good); stroke-width: 1.3; }
+        .arr { stroke: var(--ink-soft); stroke-width: 1.5; marker-end: url(#a7); fill: none; }
+      </style>
+      <defs><marker id="a7" markerWidth="7" markerHeight="7" refX="5" refY="3.5" orient="auto"><path d="M0,0 L7,3.5 L0,7 Z" fill="var(--ink-soft)"></path></marker></defs>
+
+      <rect class="recipe" x="240" y="10" width="200" height="55" rx="8"></rect>
+      <text class="t" x="340" y="32" text-anchor="middle">GRPO recipe</text>
+      <text class="s" x="340" y="48" text-anchor="middle">sample group → score → nudge</text>
+
+      <path class="arr" d="M340,65 L340,90"></path>
+
+      <!-- GSM8K track -->
+      <rect class="trackA" x="20" y="95" width="290" height="90" rx="8"></rect>
+      <text class="t" x="165" y="118" text-anchor="middle" font-size="11">GSM8K (the notebook)</text>
+      <text class="s" x="165" y="135" text-anchor="middle">base: Llama-3.2 · attempt: a math answer</text>
+      <text class="s" x="165" y="150" text-anchor="middle">reward: does the number match "####"?</text>
+      <text class="s" x="165" y="168" text-anchor="middle">result: reliable step-by-step math solver</text>
+
+      <!-- Guitar track -->
+      <rect class="trackB" x="370" y="95" width="290" height="90" rx="8"></rect>
+      <text class="t" x="515" y="118" text-anchor="middle" font-size="11">Guitar tabs (your idea)</text>
+      <text class="s" x="515" y="135" text-anchor="middle">base: an audio pitch-detection model</text>
+      <text class="s" x="515" y="150" text-anchor="middle">reward: does resynthesized audio match?</text>
+      <text class="s" x="515" y="168" text-anchor="middle">result: model tuned to guess tabs from audio</text>
+
+      <path class="arr" d="M165,90 L165,93" opacity="0"></path>
+
+      <text class="s" x="340" y="220" text-anchor="middle" font-size="11" font-weight="700">Same box at the top. Only the base model and reward function change.</text>
+      <text class="s" x="340" y="240" text-anchor="middle">Swap in any base model that can attempt a task, and any function that scores an attempt —</text>
+      <text class="s" x="340" y="256" text-anchor="middle">code (reward = do the tests pass?), summaries (reward = are the key facts present?), anything checkable.</text>
+    </svg>
+  </div>
+  <p class="visual-caption">The GRPO recipe itself never changes. What changes per project is just two things: which base model you start from, and how you write the reward function.</p>
+
+  <h2>Mapping your exact idea onto what you already know</h2>
+  <table>
+    <tr><th>GSM8K notebook</th><th>Your guitar tab idea</th></tr>
+    <tr><td>Base model: Llama-3.2, already okay at reasoning</td><td>Base model: an audio model already okay at pitch detection</td></tr>
+    <tr><td>Input: a math word problem</td><td>Input: a short audio clip of a guitar riff</td></tr>
+    <tr><td>Gold to check against: the number after <code>####</code></td><td>Gold to check against: <strong>the hard part — see below</strong></td></tr>
+    <tr><td>Reward: does the final number match?</td><td>Reward: does the note sequence match?</td></tr>
+    <tr><td>Group of 8: 8 attempts at the same problem</td><td>Group of 8: 8 tab guesses for the same clip</td></tr>
+    <tr><td>GRPO: push toward better-than-average attempts</td><td>Exactly the same</td></tr>
+  </table>
+
+  <h2>The elegant fix: don't compare to a written-down answer — compare to the sound</h2>
+  <p>GSM8K never needed a full reasoning trace, just a checkable final answer. Your guitar task doesn't need a human-labeled tab either — it needs something checkable. The original audio clip already <em>is</em> the answer key.</p>
+
+  <div class="visual">
+    <p class="visual-label">Illustration — checking a guess against reality, not against a label</p>
+    <svg viewBox="0 0 640 180" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="A guessed tab is resynthesized into audio and compared against the original clip to produce a reward, with no human label required">
+      <style>
+        .b { fill: var(--accent-soft); stroke: var(--accent); stroke-width: 1.5; }
+        .b2 { fill: var(--good-soft); stroke: var(--good); stroke-width: 1.5; }
+        .t { font: 600 11px -apple-system, sans-serif; fill: var(--ink); }
+        .s { font: 400 9.5px -apple-system, sans-serif; fill: var(--ink-soft); }
+        .arr { stroke: var(--ink-soft); stroke-width: 1.5; marker-end: url(#a7b); fill: none; }
+      </style>
+      <defs><marker id="a7b" markerWidth="7" markerHeight="7" refX="5" refY="3.5" orient="auto"><path d="M0,0 L7,3.5 L0,7 Z" fill="var(--ink-soft)"></path></marker></defs>
+      <rect class="b" x="10" y="70" width="130" height="50" rx="6"></rect>
+      <text class="t" x="75" y="92" text-anchor="middle">model's guess</text>
+      <text class="s" x="75" y="108" text-anchor="middle">(a tab: string, fret, timing)</text>
+      <path class="arr" d="M140,95 L175,95"></path>
+      <rect class="b" x="175" y="70" width="140" height="50" rx="6"></rect>
+      <text class="t" x="245" y="92" text-anchor="middle">resynthesize</text>
+      <text class="s" x="245" y="108" text-anchor="middle">play those exact notes</text>
+      <path class="arr" d="M315,95 L350,95"></path>
+      <rect class="b2" x="350" y="70" width="140" height="50" rx="6"></rect>
+      <text class="t" x="420" y="92" text-anchor="middle">compare to</text>
+      <text class="s" x="420" y="108" text-anchor="middle">the real original clip</text>
+      <path class="arr" d="M490,95 L525,95"></path>
+      <rect class="b2" x="525" y="70" width="105" height="50" rx="6"></rect>
+      <text class="t" x="577" y="92" text-anchor="middle">reward</text>
+      <text class="s" x="577" y="108" text-anchor="middle">how close?</text>
+      <text class="s" x="320" y="150" text-anchor="middle">no human ever labels anything — the original audio itself is the answer key</text>
+    </svg>
+  </div>
+  <p class="visual-caption">This reward could be stacked, exactly like Lesson 5's five functions: a big "does it sound right" reward, plus a small "is it even playable" format reward (real fret numbers, real strings, no impossible stretches).</p>
+
+  <div class="box callout">
+    <span class="box-label">Being honest about the hard part</span>
+    GRPO doesn't grant a model a new sense. Llama-3.2 could already do basic math before GRPO sharpened it — GRPO didn't create math ability from zero. For guitar tabs, you'd need to start from a model that can already listen to audio and guess pitches at all (real tools exist — e.g. <a href="https://github.com/spotify/basic-pitch" target="_blank" rel="noopener">Spotify's Basic Pitch</a>, an open-source audio-to-note model). GRPO is the <em>last-mile sharpening step</em> on top of an existing capability, not a way to conjure a whole new one from nothing.
+  </div>
+
+  <div class="box citation">
+    <span class="box-label">A more approachable first version</span>
+    Skip raw audio entirely for a first attempt. Start from an existing pitch-detector's rough (already decent) output — a sequence of notes with some mistakes — and train a <em>text</em> model to clean that up into proper tab notation, checked against a small set of known-correct examples or graded by music-theory playability rules. That's a symbolic, text-in-text-out problem — much closer to GSM8K, and a far more realistic starting project than raw audio-in, tab-out.
+  </div>
+
+  <h2>One more example, to prove this isn't just for math or hypotheticals</h2>
+  <p>The DeepSeek-R1 paper — the same one behind this whole notebook — didn't only use verifiable rewards for math. It also trained on <strong>coding</strong>, where the reward is simply: does the code compile and pass the test cases? Same recipe, same loop, completely different domain. That's the real generality of what you've just learned.</p>
+
+  <div class="box callout">
+    <span class="box-label">Primary source</span>
+    <a href="https://arxiv.org/abs/2501.12948" target="_blank" rel="noopener">DeepSeek-R1</a> — Section 2 describes exactly this: rule-based rewards for both math (answer correctness) and code (compiler/test-case feedback), no human preference labels needed for either.
+  </div>
+
+  <div class="ask-agent">
+    💬 Have a different checkable task in mind — not guitar tabs, something from your own work? Describe it to your teaching agent and ask what the reward function would look like. That's the one design decision this whole recipe hinges on.
+  </div>
+
+  <div class="lesson-nav">
+    <a href="0006-training-and-results.html">← Training &amp; Results</a>
+    <a href="0008-code-walkthrough.html">Next: Code Walkthrough →</a>
+  </div>
+</div>
+<script src="../assets/interactions.js"></script>

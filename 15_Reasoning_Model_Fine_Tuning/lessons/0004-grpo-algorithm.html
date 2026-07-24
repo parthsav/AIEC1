@@ -1,0 +1,140 @@
+<title>The GRPO Algorithm — Reasoning Model Fine-Tuning</title>
+<link rel="stylesheet" href="../assets/base.css">
+<div class="page">
+
+  <div class="crumbs"><a href="index.html">All lessons</a> · <a href="0003-reinforcement-learning-basics.html">← RL Basics</a> · <a href="../reference/0001-grpo-cheatsheet.html">Cheat sheet</a></div>
+
+  <p class="kicker">Lesson 0004 · The GRPO Algorithm</p>
+  <h1>Grading on a Curve, Instead of Hiring a Second Grader</h1>
+
+  <p>Lesson 0003 said "the policy shifts toward what scores well." GRPO's whole trick is <em>how</em> it decides what counts as "well" — without a separate grading system.</p>
+
+  <div class="box analogy">
+    <span class="box-label">Analogy first</span>
+    A teacher gives the same pop quiz to 8 students. Instead of comparing every answer to a fixed, official rubric written by a second expert (expensive to build), the teacher just <strong>grades on a curve</strong>: whoever scored above the class average did "well," whoever scored below did "poorly" — relative to their own group, on their own quiz. GRPO does exactly this, once per training step, for a group of 8 completions to the <em>same</em> question.
+  </div>
+
+  <h2>Reward vs. advantage — the distinction that matters</h2>
+  <p>A <strong>reward</strong> is a raw score (Lesson 0005 shows exactly how it's computed). An <strong>advantage</strong> is that score compared to what was expected — and it's the advantage, not the raw reward, that actually drives the update. Classic RLHF (PPO) estimates "what was expected" with a second neural network called a <strong>critic</strong>, trained alongside the policy. GRPO skips the critic entirely: the group's own average <em>is</em> the expectation.</p>
+
+  <div class="visual">
+    <p class="visual-label">Illustration — 8 completions, one group average</p>
+    <svg viewBox="0 0 640 260" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Bar chart of 8 completions' rewards compared against the group average, with above-average bars marked to increase and below-average marked to decrease">
+      <style>
+        .bar { animation: none; }
+        .above { fill: var(--good); }
+        .below { fill: var(--bad); }
+        .avgline { stroke: var(--ink); stroke-width: 1.5; stroke-dasharray: 5,3; }
+        .lbl { font: 600 11px -apple-system, sans-serif; fill: var(--ink); }
+        .s { font: 400 10px -apple-system, sans-serif; fill: var(--ink-soft); }
+        .tag { font: 700 10px -apple-system, sans-serif; }
+      </style>
+      <!-- group average line at y=140 -->
+      <line class="avgline" x1="30" y1="140" x2="610" y2="140"></line>
+      <text class="s" x="615" y="144" text-anchor="start" font-size="9">avg</text>
+
+      <!-- 8 bars, heights vary around the line (baseline y=210) -->
+      <!-- bar1: reward 2.5 -> above -->
+      <rect class="bar above" x="40" y="80" width="55" height="130"></rect>
+      <text class="tag" x="67" y="72" text-anchor="middle" fill="var(--good)">↑ push toward</text>
+      <!-- bar2: reward 0.5 -> below -->
+      <rect class="bar below" x="110" y="185" width="55" height="25"></rect>
+      <text class="tag" x="137" y="230" text-anchor="middle" fill="var(--bad)">↓ push away</text>
+      <!-- bar3: reward 3.0 -> above -->
+      <rect class="bar above" x="180" y="60" width="55" height="150"></rect>
+      <text class="tag" x="207" y="52" text-anchor="middle" fill="var(--good)">↑ push toward</text>
+      <!-- bar4: reward 1.0 -> below -->
+      <rect class="bar below" x="250" y="160" width="55" height="50"></rect>
+      <text class="tag" x="277" y="230" text-anchor="middle" fill="var(--bad)">↓ push away</text>
+      <!-- bar5: reward 0 -> below -->
+      <rect class="bar below" x="320" y="205" width="55" height="5"></rect>
+      <text class="tag" x="347" y="230" text-anchor="middle" fill="var(--bad)">↓ push away</text>
+      <!-- bar6: reward 2.8 -> above -->
+      <rect class="bar above" x="390" y="65" width="55" height="145"></rect>
+      <text class="tag" x="417" y="57" text-anchor="middle" fill="var(--good)">↑ push toward</text>
+      <!-- bar7: reward 1.2 -> below -->
+      <rect class="bar below" x="460" y="150" width="55" height="60"></rect>
+      <text class="tag" x="487" y="230" text-anchor="middle" fill="var(--bad)">↓ push away</text>
+      <!-- bar8: reward 2.6 -> above -->
+      <rect class="bar above" x="530" y="75" width="55" height="135"></rect>
+      <text class="tag" x="557" y="67" text-anchor="middle" fill="var(--good)">↑ push toward</text>
+
+      <text class="s" x="320" y="248" text-anchor="middle">8 completions to the SAME question — the dashed line is their average reward</text>
+    </svg>
+  </div>
+  <p class="visual-caption">Each bar is one of the 8 completions <code>num_generations = 8</code> samples. Anything above the dashed group average gets a positive advantage (nudge toward); anything below gets pushed away. No second network ever judged these — the group graded itself.</p>
+
+  <div class="compare">
+    <div class="col no">
+      <h4>PPO-style RLHF</h4>
+      Needs a trained <strong>critic network</strong> to estimate the expected reward for a baseline. More moving parts, more memory, more to get wrong.
+    </div>
+    <div class="col yes">
+      <h4>GRPO (this notebook)</h4>
+      The group's own average reward <em>is</em> the baseline. No critic, no extra network — just sample more completions per question.
+    </div>
+  </div>
+
+  <h2>The leash: why there's still a KL penalty</h2>
+  <p>Without a limit, a policy chasing reward can swing wildly in one update — sometimes even finding a cheap trick that scores well without actually reasoning better ("reward hacking"). GRPO adds a small penalty that keeps each update close to where the policy started, like a leash: room to explore, but not room to bolt.</p>
+
+  <div class="visual">
+    <p class="visual-label">Illustration — the KL leash</p>
+    <svg viewBox="0 0 600 160" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="A leash tethering how far the policy can move in one update">
+      <style>
+        .leash { stroke: var(--ink-soft); stroke-width: 2; stroke-dasharray: 4,3; }
+        .pt { fill: var(--accent); }
+        .old { fill: var(--ink-soft); }
+        .lbl { font: 600 11px -apple-system, sans-serif; fill: var(--ink); }
+        .s { font: 400 10px -apple-system, sans-serif; fill: var(--ink-soft); }
+        .pull { animation: pull 3s infinite ease-in-out; }
+        @keyframes pull {
+          0%, 100% { transform: translateX(0); }
+          50% { transform: translateX(-25px); }
+        }
+      </style>
+      <circle class="old" cx="120" cy="90" r="10"></circle>
+      <text class="lbl" x="120" y="120" text-anchor="middle">policy before</text>
+      <text class="s" x="120" y="135" text-anchor="middle">this update</text>
+
+      <circle class="pt pull" cx="470" cy="90" r="10"></circle>
+      <text class="lbl" x="470" y="120" text-anchor="middle">where reward alone</text>
+      <text class="s" x="470" y="135" text-anchor="middle">would pull it</text>
+
+      <line class="leash" x1="130" y1="90" x2="460" y2="90"></line>
+      <text class="s" x="295" y="75" text-anchor="middle">KL penalty = the leash's length</text>
+    </svg>
+  </div>
+  <p class="visual-caption">Reward pulls the dot rightward every step. The KL penalty is the leash holding it back from moving too far, too fast, in any single update.</p>
+
+  <div class="box citation">
+    <span class="box-label">Where this lives in your notebook</span>
+    <code>num_generations = 8</code> in <strong>Task 6</strong>'s <code>GRPOConfig</code> is the group size from the illustration above. TRL's <code>GRPOTrainer</code> applies a KL penalty by default even though this notebook doesn't override its weight explicitly — see the <a href="https://huggingface.co/docs/trl/main/en/grpo_trainer" target="_blank" rel="noopener">GRPOTrainer docs</a> for the exact default. <code>max_grad_norm = 0.1</code> in the same config is a second, simpler stability guard — it caps how big any single update step can be, regardless of the KL term.
+  </div>
+
+  <div class="quiz">
+    <p class="q">Quick check: why doesn't GRPO need a separate critic network?</p>
+    <div class="choices" data-quiz data-wrong-msg="Not quite — re-read the curve-grading analogy: the group grades itself.">
+      <button class="choice" data-correct="false">critics are only needed for supervised fine-tuning</button>
+      <button class="choice" data-correct="true" data-right-msg="Right — that's the whole &quot;group relative&quot; part of Group Relative Policy Optimization.">the group's own average reward serves as the baseline</button>
+      <button class="choice" data-correct="false">LoRA already includes a built-in critic module</button>
+      <button class="choice" data-correct="false">GSM8K questions never need a baseline at all</button>
+    </div>
+    <p class="feedback"></p>
+  </div>
+
+  <div class="box callout">
+    <span class="box-label">Primary source</span>
+    <a href="https://arxiv.org/abs/2402.03300" target="_blank" rel="noopener">DeepSeekMath</a>, Section 4.1, is where GRPO was formally introduced — it has the exact advantage formula (each reward, minus the group mean, divided by the group's spread). <a href="https://arxiv.org/abs/2501.12948" target="_blank" rel="noopener">DeepSeek-R1</a> is where this exact recipe was scaled up to produce a full reasoning model.
+  </div>
+
+  <div class="ask-agent">
+    💬 Ask your teaching agent: "what happens if all 8 completions in a group get the exact same reward?" (Hint: think about what "above average" means when nothing is above average.)
+  </div>
+
+  <div class="lesson-nav">
+    <a href="0003-reinforcement-learning-basics.html">← RL Basics</a>
+    <a href="0005-reward-functions-and-gsm8k.html">Next: Reward Functions &amp; GSM8K →</a>
+  </div>
+</div>
+<script src="../assets/interactions.js"></script>

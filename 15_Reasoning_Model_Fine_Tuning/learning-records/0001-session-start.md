@@ -1,0 +1,3 @@
+# Prior knowledge: comfortable using LLMs, zero exposure to training them
+
+Parth has completed 14 prior certification sessions covering RAG, agentic systems, evaluation, and MCP — all of which treat the LLM as a fixed, pretrained black box accessed via API. This session (fine-tuning with LoRA + GRPO) is the first to open that box and change its weights, so terms like "prompt" and "token" can be assumed known, but "gradient," "policy," "reward function," and "LoRA rank" cannot. Future sessions in this workspace should build training/RL vocabulary from zero, without re-explaining what an LLM or a prompt is.

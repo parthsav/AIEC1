@@ -1,0 +1,125 @@
+<title>Reward Functions &amp; GSM8K — Reasoning Model Fine-Tuning</title>
+<link rel="stylesheet" href="../assets/base.css">
+<div class="page">
+
+  <div class="crumbs"><a href="index.html">All lessons</a> · <a href="0004-grpo-algorithm.html">← The GRPO Algorithm</a> · <a href="../reference/0001-grpo-cheatsheet.html">Cheat sheet</a></div>
+
+  <p class="kicker">Lesson 0005 · Reward Functions &amp; GSM8K</p>
+  <h1>Five Small Graders, Stacked Into One Score</h1>
+
+  <div class="box analogy">
+    <span class="box-label">Analogy first</span>
+    Olympic diving doesn't have one judge shouting "good" or "bad." It stacks several separate scores — degree of difficulty, execution, entry — into one number. This notebook scores every completion the same way: five small, independent checks, added together into one reward.
+  </div>
+
+  <p>Task 5 defines exactly five reward functions. Each checks <em>one</em> thing and returns a small number; <code>GRPOTrainer</code> just adds them all up.</p>
+
+  <table>
+    <tr><th>Reward function</th><th>Checks</th><th>Max</th></tr>
+    <tr><td><code>correctness_reward_func</code></td><td>extracted answer equals the gold GSM8K answer</td><td>2.0</td></tr>
+    <tr><td><code>int_reward_func</code></td><td>extracted answer is a plain integer</td><td>0.5</td></tr>
+    <tr><td><code>strict_format_reward_func</code></td><td>exact <code>&lt;reasoning&gt;</code>/<code>&lt;answer&gt;</code> layout, newlines included</td><td>0.5</td></tr>
+    <tr><td><code>soft_format_reward_func</code></td><td>tags appear in the right order, loosely</td><td>0.5</td></tr>
+    <tr><td><code>xmlcount_reward_func</code></td><td>partial credit per correctly placed tag</td><td>~0.5</td></tr>
+  </table>
+
+  <p>Correctness is worth 2.0 — four times any single format reward — but the format rewards matter enormously <em>early</em>: a model that has never once gotten a math problem right still earns something for getting the shape of its answer right, and that "something" is the only signal it has to learn from before it can solve any math at all.</p>
+
+  <h2>Try it: click a completion</h2>
+  <div class="visual" data-toggle-group>
+    <p class="visual-label">Interactive — same reward stack, three different completions</p>
+    <div class="visual-controls">
+      <button class="btn active" data-toggle="panel-a">A: rambling, wrong</button>
+      <button class="btn" data-toggle="panel-b">B: right shape, wrong answer</button>
+      <button class="btn" data-toggle="panel-c">C: right shape, right answer</button>
+    </div>
+
+    <div class="toggle-panel active" id="panel-a">
+      <div class="code-file">completion (gold answer: 23)</div>
+      <pre>Well, Emma had some cats, and then bought more,
+so I think maybe it's like 20 or so cats total?</pre>
+      <div class="stack-bar empty"></div>
+      <p class="stack-total">Total reward: <strong>0.0</strong> / 4.0 possible — no tags, no digit, no match. Nothing here for GRPO to reward.</p>
+      <div class="stack-legend">
+        <div><span class="dot" style="background:var(--series-1)"></span>correctness <span>0.0</span></div>
+        <div><span class="dot" style="background:var(--series-2)"></span>is-integer <span>0.0</span></div>
+        <div><span class="dot" style="background:var(--series-3)"></span>strict format <span>0.0</span></div>
+        <div><span class="dot" style="background:var(--series-4)"></span>soft format <span>0.0</span></div>
+        <div><span class="dot" style="background:var(--series-5)"></span>xml tag count <span>0.0</span></div>
+      </div>
+    </div>
+
+    <div class="toggle-panel" id="panel-b">
+      <div class="code-file">completion (gold answer: 23)</div>
+      <pre>&lt;reasoning&gt;
+Emma started with 3 cats and the shop gave her more.
+&lt;/reasoning&gt;
+&lt;answer&gt;
+99
+&lt;/answer&gt;</pre>
+      <div class="stack-bar">
+        <div class="stack-seg" style="width:12.5%;background:var(--series-2)"></div>
+        <div class="stack-seg" style="width:12.5%;background:var(--series-3)"></div>
+        <div class="stack-seg" style="width:12.5%;background:var(--series-4)"></div>
+        <div class="stack-seg" style="width:12.5%;background:var(--series-5)"></div>
+      </div>
+      <p class="stack-total">Total reward: <strong>2.0</strong> / 4.0 — wrong answer, but perfectly shaped. This is the "early gradient" the notebook talks about.</p>
+      <div class="stack-legend">
+        <div><span class="dot" style="background:var(--series-1)"></span>correctness <span>0.0</span></div>
+        <div><span class="dot" style="background:var(--series-2)"></span>is-integer <span>0.5</span></div>
+        <div><span class="dot" style="background:var(--series-3)"></span>strict format <span>0.5</span></div>
+        <div><span class="dot" style="background:var(--series-4)"></span>soft format <span>0.5</span></div>
+        <div><span class="dot" style="background:var(--series-5)"></span>xml tag count <span>0.5</span></div>
+      </div>
+    </div>
+
+    <div class="toggle-panel" id="panel-c">
+      <div class="code-file">completion (gold answer: 23)</div>
+      <pre>&lt;reasoning&gt;
+Emma started with 3 cats and adopted 20 more.
+&lt;/reasoning&gt;
+&lt;answer&gt;
+23
+&lt;/answer&gt;</pre>
+      <div class="stack-bar">
+        <div class="stack-seg" style="width:50%;background:var(--series-1)"></div>
+        <div class="stack-seg" style="width:12.5%;background:var(--series-2)"></div>
+        <div class="stack-seg" style="width:12.5%;background:var(--series-3)"></div>
+        <div class="stack-seg" style="width:12.5%;background:var(--series-4)"></div>
+        <div class="stack-seg" style="width:12.5%;background:var(--series-5)"></div>
+      </div>
+      <p class="stack-total">Total reward: <strong>4.0</strong> / 4.0 — right shape <em>and</em> right answer. Maximum score.</p>
+      <div class="stack-legend">
+        <div><span class="dot" style="background:var(--series-1)"></span>correctness <span>2.0</span></div>
+        <div><span class="dot" style="background:var(--series-2)"></span>is-integer <span>0.5</span></div>
+        <div><span class="dot" style="background:var(--series-3)"></span>strict format <span>0.5</span></div>
+        <div><span class="dot" style="background:var(--series-4)"></span>soft format <span>0.5</span></div>
+        <div><span class="dot" style="background:var(--series-5)"></span>xml tag count <span>0.5</span></div>
+      </div>
+    </div>
+  </div>
+  <p class="visual-caption">These three numbers (0.0 → 2.0 → 4.0) are computed by literally running the notebook's own reward functions on each completion string — nothing here is invented. Notice B already earns half credit despite a wrong answer: that's the staircase the model climbs before it ever solves a single problem.</p>
+
+  <h2>Why GSM8K needs no reasoning traces</h2>
+  <p>Every GSM8K answer ends with a gold number after a <code>####</code> marker. That marker is all <code>correctness_reward_func</code> needs — it never sees or judges the model's reasoning text, only whether the final number matches.</p>
+
+  <div class="box citation">
+    <span class="box-label">Where this lives in your notebook</span>
+    <strong>Task 4</strong>: <code>extract_hash_answer</code> pulls the gold number out of GSM8K's <code>####</code> format; <code>extract_xml_answer</code> pulls the model's guess out of its own <code>&lt;answer&gt;</code> tags. <strong>Task 5</strong>: the actual sanity check in the notebook (right before Task 6) runs <code>soft_format_reward_func</code> and <code>strict_format_reward_func</code> on <code>"&lt;reasoning&gt;Wow, cool!&lt;/reasoning&gt;&lt;answer&gt;23&lt;/answer&gt;"</code> — a one-line completion. Soft accepts it; strict rejects it, for exactly the reason Completion B above only scores 0.5 on strict, not 0.5 twice.
+  </div>
+
+  <div class="box callout">
+    <span class="box-label">Primary source</span>
+    <a href="https://gist.github.com/willccbb/4676755236bb08cab5f4e54a0475d6fb" target="_blank" rel="noopener">willccbb's reward-function gist</a> — the exact original source these five functions are adapted from, with the author's own commentary. Also see the <a href="https://huggingface.co/datasets/openai/gsm8k" target="_blank" rel="noopener">GSM8K dataset card</a> for the raw data format.
+  </div>
+
+  <div class="ask-agent">
+    💬 Ask your teaching agent: "could I write a sixth reward function?" — that's exactly what the notebook invites you to experiment with.
+  </div>
+
+  <div class="lesson-nav">
+    <a href="0004-grpo-algorithm.html">← The GRPO Algorithm</a>
+    <a href="0006-training-and-results.html">Next: Training &amp; Results →</a>
+  </div>
+</div>
+<script src="../assets/interactions.js"></script>

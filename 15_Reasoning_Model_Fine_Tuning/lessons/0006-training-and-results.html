@@ -1,0 +1,134 @@
+<title>Training &amp; Results — Reasoning Model Fine-Tuning</title>
+<link rel="stylesheet" href="../assets/base.css">
+<div class="page">
+
+  <div class="crumbs"><a href="index.html">All lessons</a> · <a href="0005-reward-functions-and-gsm8k.html">← Reward Functions &amp; GSM8K</a> · <a href="../reference/0001-grpo-cheatsheet.html">Cheat sheet</a></div>
+
+  <p class="kicker">Lesson 0006 · Training &amp; Results</p>
+  <h1>Watching Reward Climb, Then Swapping Personalities</h1>
+
+  <p>Every earlier lesson explained one moving piece. This lesson is Tasks 6–9: configure it, hit train, and see what actually changes.</p>
+
+  <h2>A few configuration knobs, in plain terms</h2>
+
+  <div class="box analogy">
+    <span class="box-label">Analogy first</span>
+    <code>learning_rate</code> is how big a step you take with each correction — too big and you overshoot, too small and you barely move. <code>warmup_ratio</code> is easing a car off a stop instead of flooring the gas — a few gentle steps first, so the optimizer's early statistics aren't built on wild swings. <code>lr_scheduler_type = "cosine"</code> is easing off the gas near the end too — a smooth curve down to a gentle stop, rather than slamming the brakes.
+  </div>
+
+  <p>One rule is stricter than a suggestion — it's a hard requirement TRL enforces:</p>
+
+  <div class="box callout">
+    <span class="box-label">The batch-geometry rule</span>
+    <code>per_device_train_batch_size × gradient_accumulation_steps</code> must be evenly divisible by <code>num_generations</code> (the group size, 8). Think of it like splitting a class into study groups of exactly 8 — the total headcount gathered before an update must tile into whole groups, with nobody left over. That's why this notebook pairs <code>batch_size = 1</code> with <code>gradient_accumulation_steps = 8</code>.
+  </div>
+
+  <h2>Loss goes down. Reward goes... up.</h2>
+  <p>Every other fine-tuning method you've likely heard of watches a <strong>loss</strong> number fall. GRPO flips that: there is no "correct" text to compare against, so instead you watch <strong>reward</strong> — the sum from Lesson 0005 — climb.</p>
+
+  <div class="visual">
+    <p class="visual-label">Illustration — two different things to watch</p>
+    <div class="compare">
+      <div class="col no" style="background:var(--paper-raised);border-color:var(--rule);">
+        <h4>Supervised fine-tuning: loss ↓</h4>
+        <svg viewBox="0 0 260 110" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Line chart of loss steadily decreasing over training steps">
+          <style>.ln{fill:none;stroke:var(--ink-soft);stroke-width:2;} .ax{stroke:var(--rule);stroke-width:1;} .t{font:400 9px -apple-system,sans-serif;fill:var(--ink-soft);}</style>
+          <line class="ax" x1="20" y1="90" x2="245" y2="90"></line>
+          <line class="ax" x1="20" y1="10" x2="20" y2="90"></line>
+          <path class="ln" d="M25,20 C80,45 120,65 160,78 C190,85 210,88 240,89"></path>
+          <text class="t" x="132" y="105" text-anchor="middle">training steps →</text>
+        </svg>
+        <p style="font-size:0.85rem;color:var(--ink-soft);">Steadily, predictably falls as the model copies examples more closely.</p>
+      </div>
+      <div class="col yes" style="background:var(--paper-raised);border-color:var(--rule);">
+        <h4>GRPO: reward ↑ (eventually)</h4>
+        <svg viewBox="0 0 260 110" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Line chart of reward staying flat near zero then suddenly climbing, the Aha moment">
+          <style>.ln2{fill:none;stroke:var(--series-1);stroke-width:2;} .ax{stroke:var(--rule);stroke-width:1;} .t{font:400 9px -apple-system,sans-serif;fill:var(--ink-soft);} .aha{font:700 9px -apple-system,sans-serif;fill:var(--series-1);}</style>
+          <line class="ax" x1="20" y1="90" x2="245" y2="90"></line>
+          <line class="ax" x1="20" y1="10" x2="20" y2="90"></line>
+          <path class="ln2" d="M25,85 C70,83 110,84 140,82 C160,75 175,45 195,25 C210,15 225,12 240,10"></path>
+          <text class="aha" x="185" y="38" text-anchor="middle">"Aha!"</text>
+          <text class="t" x="132" y="105" text-anchor="middle">training steps →</text>
+        </svg>
+        <p style="font-size:0.85rem;color:var(--ink-soft);">Flat and noisy for a long while (~100–150 steps here), then climbs once the model starts actually solving problems.</p>
+      </div>
+    </div>
+  </div>
+  <p class="visual-caption">Same x-axis, opposite y-axis story. If your reward graph looks flat for a long time, that isn't broken — it's the normal shape of this kind of training.</p>
+
+  <div class="box citation">
+    <span class="box-label">Where this lives in your notebook</span>
+    <strong>Task 7</strong>'s markdown cell describes this exact shape: <em>"reward hovers near ~0 and then suddenly starts climbing... expect little movement before step ~100–150."</em> The DeepSeek-R1 paper calls this the model's <strong>"Aha moment"</strong> — the point where it starts, unprompted, re-checking its own reasoning mid-answer.
+  </div>
+
+  <h2>Same engine, two personalities</h2>
+  <p>Task 8's clever detail: LoRA never touches the frozen base weights, so the exact same running vLLM engine can generate from the untrained base model <em>or</em> the trained one — just by swapping which adapter rides along.</p>
+
+  <div class="visual">
+    <p class="visual-label">Illustration — swapping adapters on one frozen engine</p>
+    <svg viewBox="0 0 620 200" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Diagram showing one frozen model engine producing two different outputs depending on which LoRA adapter is attached">
+      <style>
+        .core { fill: var(--paper-raised); stroke: var(--ink-soft); stroke-width: 1.5; stroke-dasharray: 4,3; }
+        .lbl { font: 600 12px -apple-system, sans-serif; fill: var(--ink); }
+        .s { font: 400 10px -apple-system, sans-serif; fill: var(--ink-soft); }
+        .p1 { fill: var(--accent-soft); stroke: var(--accent); stroke-width: 1.5; }
+        .arr { stroke: var(--ink-soft); stroke-width: 1.5; marker-end: url(#a3); fill: none; }
+      </style>
+      <defs><marker id="a3" markerWidth="7" markerHeight="7" refX="5" refY="3.5" orient="auto"><path d="M0,0 L7,3.5 L0,7 Z" fill="var(--ink-soft)"></path></marker></defs>
+
+      <rect class="core" x="220" y="70" width="180" height="60" rx="8"></rect>
+      <text class="lbl" x="310" y="95" text-anchor="middle">frozen base model</text>
+      <text class="s" x="310" y="112" text-anchor="middle">(same weights both times)</text>
+
+      <rect class="p1" x="230" y="10" width="160" height="35" rx="6"></rect>
+      <text class="lbl" x="310" y="32" text-anchor="middle" font-size="11">lora_request = None</text>
+      <path class="arr" d="M310,45 L310,68"></path>
+
+      <rect class="p1" x="20" y="70" width="150" height="60" rx="8"></rect>
+      <text class="lbl" x="95" y="95" text-anchor="middle">"Calculate pi."</text>
+      <text class="s" x="95" y="112" text-anchor="middle">— no reasoning tags</text>
+      <path class="arr" d="M220,100 L175,100"></path>
+
+      <rect class="p1" x="450" y="70" width="150" height="60" rx="8"></rect>
+      <text class="lbl" x="525" y="90" text-anchor="middle">"&lt;reasoning&gt;...</text>
+      <text class="lbl" x="525" y="105" text-anchor="middle">&lt;answer&gt;...&lt;/answer&gt;"</text>
+      <path class="arr" d="M400,100 L445,100"></path>
+
+      <rect class="p1" x="230" y="150" width="160" height="35" rx="6"></rect>
+      <text class="lbl" x="310" y="172" text-anchor="middle" font-size="11">lora_request = trained adapter</text>
+      <path class="arr" d="M310,130 L310,148" transform="rotate(180 310 139)"></path>
+    </svg>
+  </div>
+  <p class="visual-caption">Left output: the base model, unstructured. Right output: the exact same engine, same frozen weights — just with the trained LoRA adapter attached — producing the structured reasoning it was trained to.</p>
+
+  <p><code>model.save_lora("grpo_saved_lora")</code> in Task 9 writes <em>only</em> the small <code>A</code>/<code>B</code> matrices from Lesson 0001 — a few hundred megabytes at rank 64, instead of the several gigabytes a full model checkpoint would need. Loading it back with <code>model.load_lora(...)</code> hands you exactly the <code>lora_request</code> object the diagram above swaps in.</p>
+
+  <div class="quiz">
+    <p class="q">Quick check: why can the same vLLM engine generate from both the base and trained model?</p>
+    <div class="choices" data-quiz data-wrong-msg="Not quite — think about what LoRA never touches, from Lesson 0001.">
+      <button class="choice" data-correct="false">two separate models are loaded into memory</button>
+      <button class="choice" data-correct="true" data-right-msg="Exactly — the base weights are frozen and shared; only the small adapter changes.">the base weights are frozen, so LoRA is just an optional add-on</button>
+      <button class="choice" data-correct="false">GRPO retrains the whole model from scratch each time</button>
+      <button class="choice" data-correct="false">vLLM automatically merges every adapter it ever sees</button>
+    </div>
+    <p class="feedback"></p>
+  </div>
+
+  <div class="box callout">
+    <span class="box-label">Primary source</span>
+    <a href="https://huggingface.co/docs/trl/main/en/grpo_trainer" target="_blank" rel="noopener">TRL's GRPOTrainer / GRPOConfig documentation</a> — the authoritative reference for every argument in Task 6, including ones this notebook leaves at their default. For hardware tuning specifically, see the <a href="https://docs.unsloth.ai/basics/reinforcement-learning-guide" target="_blank" rel="noopener">Unsloth RL guide</a>.
+  </div>
+
+  <h2>You've now covered the whole module</h2>
+  <p>Lessons 0000–0006 map directly onto the notebook's own Tasks 1–9 and Questions 1–4. Before you answer those questions in your own words, it's worth re-walking the <a href="0000-big-picture.html">big picture loop</a> once more with all the pieces in place.</p>
+
+  <div class="ask-agent">
+    💬 Ready to attempt the notebook's Questions 1–4? Talk them through with your teaching agent before writing your final answers — it can tell you if your explanation is on the right track without just giving you the answer.
+  </div>
+
+  <div class="lesson-nav">
+    <a href="0005-reward-functions-and-gsm8k.html">← Reward Functions &amp; GSM8K</a>
+    <a href="0007-why-this-matters.html">Next: Why This Matters →</a>
+  </div>
+</div>
+<script src="../assets/interactions.js"></script>

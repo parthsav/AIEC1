@@ -1,0 +1,142 @@
+<title>The Big Picture — Reasoning Model Fine-Tuning</title>
+<link rel="stylesheet" href="../assets/base.css">
+<div class="page">
+
+  <div class="crumbs"><a href="index.html">All lessons</a> · <a href="../reference/0001-grpo-cheatsheet.html">Cheat sheet</a></div>
+
+  <p class="kicker">Lesson 0000 · Big Picture</p>
+  <h1>Teaching a Model to Reason, Without Ever Showing It How</h1>
+
+  <p>Every session so far has treated the model like a locked box: you send it a prompt, it sends back words. This session, for the first time, you open the box and change what's inside. This lesson is the 30,000-foot map of exactly what that means — read this one first.</p>
+
+  <div class="box analogy">
+    <span class="box-label">Analogy first</span>
+    Imagine teaching someone to shoot free throws. One way: you physically move their arms through the "correct" motion, over and over, until they copy it. That's <strong>showing</strong> them how. The other way: you just let them shoot a hundred free throws, tell them which ones went in, and let them adjust on their own — you never touch their arms. That's <strong>rewarding</strong> them for results. This session uses the second way.
+  </div>
+
+  <p>The first way has a name: <strong>supervised fine-tuning (SFT)</strong> — show the model worked examples of good reasoning, and it copies the pattern. The second way is <strong>reinforcement learning (RL)</strong> — score the model's own attempts, and let it discover what works. This notebook uses RL, specifically an algorithm called <strong>GRPO</strong> (Group Relative Policy Optimization) — the same core idea behind DeepSeek-R1.</p>
+
+  <div class="visual">
+    <p class="visual-label">Illustration — the GRPO loop</p>
+    <svg viewBox="0 0 720 300" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Animated diagram of the GRPO training loop">
+      <defs>
+        <marker id="arrow" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto">
+          <path d="M0,0 L8,4 L0,8 Z" fill="var(--ink-soft)"></path>
+        </marker>
+      </defs>
+      <style>
+        .stage { fill: var(--paper); stroke: var(--rule); stroke-width: 1.5; }
+        .stage-text { font: 600 12px -apple-system, sans-serif; fill: var(--ink); }
+        .stage-sub { font: 400 10px -apple-system, sans-serif; fill: var(--ink-soft); }
+        .flow-arrow { stroke: var(--ink-soft); stroke-width: 1.5; marker-end: url(#arrow); fill: none; }
+        .pulse { animation: bigpicPulse 9s infinite; }
+        .s1 { animation-delay: 0s; }
+        .s2 { animation-delay: 1.5s; }
+        .s3 { animation-delay: 3s; }
+        .s4 { animation-delay: 4.5s; }
+        .s5 { animation-delay: 6s; }
+        .s6 { animation-delay: 7.5s; }
+        @keyframes bigpicPulse {
+          0% { stroke: var(--rule); fill: var(--paper); }
+          6% { stroke: var(--accent); fill: var(--accent-soft); }
+          16% { stroke: var(--accent); fill: var(--accent-soft); }
+          22% { stroke: var(--rule); fill: var(--paper); }
+          100% { stroke: var(--rule); fill: var(--paper); }
+        }
+      </style>
+
+      <!-- Stage 1: prompt -->
+      <rect class="stage pulse s1" x="10" y="30" width="110" height="60" rx="8"></rect>
+      <text class="stage-text" x="65" y="55" text-anchor="middle">1. Prompt</text>
+      <text class="stage-sub" x="65" y="72" text-anchor="middle">a math question</text>
+
+      <path class="flow-arrow" d="M120,60 L155,60"></path>
+
+      <!-- Stage 2: group sample -->
+      <rect class="stage pulse s2" x="155" y="15" width="130" height="90" rx="8"></rect>
+      <text class="stage-text" x="220" y="38" text-anchor="middle">2. Sample a</text>
+      <text class="stage-text" x="220" y="52" text-anchor="middle">group of 8</text>
+      <text class="stage-sub" x="220" y="70" text-anchor="middle">8 different attempts</text>
+      <text class="stage-sub" x="220" y="83" text-anchor="middle">at the same question</text>
+
+      <path class="flow-arrow" d="M285,60 L320,60"></path>
+
+      <!-- Stage 3: reward score -->
+      <rect class="stage pulse s3" x="320" y="15" width="130" height="90" rx="8"></rect>
+      <text class="stage-text" x="385" y="38" text-anchor="middle">3. Score each</text>
+      <text class="stage-text" x="385" y="52" text-anchor="middle">with rewards</text>
+      <text class="stage-sub" x="385" y="70" text-anchor="middle">right answer? right</text>
+      <text class="stage-sub" x="385" y="83" text-anchor="middle">format? both add up</text>
+
+      <path class="flow-arrow" d="M450,60 L485,60"></path>
+
+      <!-- Stage 4: group average -->
+      <rect class="stage pulse s4" x="485" y="15" width="140" height="90" rx="8"></rect>
+      <text class="stage-text" x="555" y="38" text-anchor="middle">4. Compare to</text>
+      <text class="stage-text" x="555" y="52" text-anchor="middle">the group average</text>
+      <text class="stage-sub" x="555" y="70" text-anchor="middle">above avg = do more</text>
+      <text class="stage-sub" x="555" y="83" text-anchor="middle">below avg = do less</text>
+
+      <path class="flow-arrow" d="M555,105 L555,140"></path>
+
+      <!-- Stage 5: update -->
+      <rect class="stage pulse s5" x="485" y="140" width="140" height="60" rx="8"></rect>
+      <text class="stage-text" x="555" y="165" text-anchor="middle">5. Nudge the model</text>
+      <text class="stage-sub" x="555" y="182" text-anchor="middle">(a small LoRA piece)</text>
+
+      <path class="flow-arrow" d="M485,170 L120,170"></path>
+
+      <!-- Stage 6: repeat -->
+      <rect class="stage pulse s6" x="10" y="140" width="110" height="60" rx="8"></rect>
+      <text class="stage-text" x="65" y="165" text-anchor="middle">6. Repeat</text>
+      <text class="stage-sub" x="65" y="182" text-anchor="middle">~175+ times</text>
+
+      <path class="flow-arrow" d="M65,140 L65,90" stroke-dasharray="3,3"></path>
+    </svg>
+  </div>
+  <p class="visual-caption">Watch the highlight travel around the loop. Every box glows once per lap — that's one training step. The model never sees a "correct" reasoning trace; it only ever sees a number telling it how well it did compared to its own other 7 attempts.</p>
+
+  <h2>Two things make this cheap enough to run on one GPU</h2>
+
+  <div class="compare">
+    <div class="col no">
+      <h4>What full fine-tuning would cost</h4>
+      Llama-3.2-3B has 3 billion numbers. Updating all of them needs huge memory for gradients and optimizer state — far more than a normal GPU has.
+    </div>
+    <div class="col yes">
+      <h4>What this notebook actually does</h4>
+      Freeze all 3 billion numbers. Attach a tiny trainable patch called <strong>LoRA</strong> next to a few key layers. Only the patch — a few million numbers — ever changes.
+    </div>
+  </div>
+
+  <p>And instead of needing a second, separate "critic" network to judge how good each attempt was (the way classic RLHF/PPO does), GRPO judges each attempt against <strong>the average of its own group of 8</strong>. No critic network needed — that's the "group relative" part of the name, and a big reason this fits on a single consumer GPU.</p>
+
+  <div class="box citation">
+    <span class="box-label">Where this lives in your notebook</span>
+    <code>01_Reasoning_Fine_Tuning_Unsloth_GRPO.ipynb</code> — the six-step loop above is described in the markdown cell right before <strong>Task 4</strong> ("GRPO turns fine-tuning into a reward game"), and the actual training call is <code>trainer.train()</code> in <strong>Task 7</strong>.
+  </div>
+
+  <h2>The four ideas this module is really testing</h2>
+  <p>Every task and question in the notebook is really just one of these four ideas wearing a costume. The next lessons take them one at a time:</p>
+  <ol>
+    <li><strong>LoRA</strong> — how to make fine-tuning cheap → <a href="0001-fine-tuning-and-lora.html">Lesson 0001</a></li>
+    <li><strong>Transformer anatomy</strong> — what LoRA is actually patching → <a href="0002-transformer-anatomy.html">Lesson 0002</a></li>
+    <li><strong>Reinforcement learning basics</strong> — reward instead of copying → <a href="0003-reinforcement-learning-basics.html">Lesson 0003</a></li>
+    <li><strong>GRPO itself</strong> — the group-relative trick in detail → <a href="0004-grpo-algorithm.html">Lesson 0004</a></li>
+  </ol>
+  <p>After that: <a href="0005-reward-functions-and-gsm8k.html">how the reward functions are designed</a>, and <a href="0006-training-and-results.html">what actually happens when you hit train</a>.</p>
+
+  <div class="box callout">
+    <span class="box-label">Primary source</span>
+    For the definitive plain-language account of this exact loop, read the <a href="https://arxiv.org/abs/2501.12948" target="_blank" rel="noopener">DeepSeek-R1 paper</a>, Section 2.2 — the paper that made GRPO famous, and the one this notebook's loop is modeled on.
+  </div>
+
+  <div class="ask-agent">
+    💬 Confused by anything above? Ask your teaching agent — that's what it's there for. Try: "why doesn't GRPO need a critic network?"
+  </div>
+
+  <div class="lesson-nav">
+    <span>You're at the start.</span>
+    <a href="0001-fine-tuning-and-lora.html">Next: Fine-Tuning &amp; LoRA →</a>
+  </div>
+</div>

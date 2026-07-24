@@ -1,0 +1,123 @@
+<title>Colab &amp; The Assignment — Reasoning Model Fine-Tuning</title>
+<link rel="stylesheet" href="../assets/base.css">
+<div class="page">
+
+  <div class="crumbs"><a href="index.html">All lessons</a> · <a href="0009-designing-rewards-without-ground-truth.html">← Designing Rewards Without Ground Truth</a> · <a href="../reference/0001-grpo-cheatsheet.html">Cheat sheet</a></div>
+
+  <p class="kicker">Lesson 0010 · Colab &amp; The Assignment</p>
+  <h1>Why Colab, and What You're Actually Being Asked to Do</h1>
+
+  <p>Everything so far explained the notebook's ideas. This lesson steps outside the notebook, to the practical stuff: what Colab is, why this specific session needs it, what the assignment actually wants from you, and a first pass at the 4 graded questions.</p>
+
+  <h2>What is Colab?</h2>
+  <div class="box analogy">
+    <span class="box-label">Analogy first</span>
+    Normally, running code means using the computer sitting in front of you. <strong>Google Colab is a computer you rent by the hour, that lives in Google's data center, which you control entirely from a web page.</strong> You type code into your browser; it actually runs on Google's machine, not yours. The appeal here: Google's machines can have a real NVIDIA GPU built in — yours might not.
+  </div>
+  <p>Colab (Google Colaboratory) is a free-to-start, pay-for-more service that gives you a Jupyter notebook (the same <code>.ipynb</code> format you've been using) connected to a cloud machine instead of your laptop. You pick a "runtime" (which hardware you want), and Colab hands you one, temporarily.</p>
+
+  <h2>Why does THIS session specifically need it?</h2>
+  <p>Your README says this session is different from every one before it:</p>
+  <div class="box citation">
+    <span class="box-label">Straight from this session's README.md</span>
+    <strong>"NVIDIA GPU, Ampere or newer (compute capability &gt;= 8.0)... 16 GB+ VRAM... Linux or WSL2 only. The training stack (vLLM, Triton, xformers) does not ship macOS wheels — <code>uv sync</code> will refuse to resolve on macOS by design."</strong>
+  </div>
+
+  <div class="visual">
+    <p class="visual-label">Illustration — why your own machine is a dead end for this one session</p>
+    <svg viewBox="0 0 640 190" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Your local Mac is blocked from running this notebook, while Colab provides a Linux machine with a compatible NVIDIA GPU">
+      <style>
+        .bad { fill: var(--bad-soft); stroke: var(--bad); stroke-width: 1.5; }
+        .good { fill: var(--good-soft); stroke: var(--good); stroke-width: 1.5; }
+        .t { font: 600 12px -apple-system, sans-serif; fill: var(--ink); }
+        .s { font: 400 10px -apple-system, sans-serif; fill: var(--ink-soft); }
+      </style>
+      <rect class="bad" x="20" y="30" width="270" height="130" rx="10"></rect>
+      <text class="t" x="155" y="55" text-anchor="middle">Your own machine (macOS)</text>
+      <text class="s" x="155" y="78" text-anchor="middle">✗ no compatible NVIDIA GPU</text>
+      <text class="s" x="155" y="96" text-anchor="middle">✗ not Linux/WSL2</text>
+      <text class="s" x="155" y="114" text-anchor="middle">✗ vLLM/Triton/xformers have</text>
+      <text class="s" x="155" y="130" text-anchor="middle">   no macOS install available</text>
+      <text class="t" x="155" y="152" text-anchor="middle" font-size="11">→ uv sync refuses to even resolve</text>
+
+      <rect class="good" x="350" y="30" width="270" height="130" rx="10"></rect>
+      <text class="t" x="485" y="55" text-anchor="middle">Google Colab (rented cloud PC)</text>
+      <text class="s" x="485" y="78" text-anchor="middle">✓ real NVIDIA L4/A100 GPU</text>
+      <text class="s" x="485" y="96" text-anchor="middle">✓ runs Linux already</text>
+      <text class="s" x="485" y="114" text-anchor="middle">✓ everything installs cleanly</text>
+      <text class="t" x="485" y="152" text-anchor="middle" font-size="11">→ this is why ColabVersion__...ipynb exists</text>
+    </svg>
+  </div>
+  <p class="visual-caption">Every other session in this course, you were just calling an API — any computer works. This is the first session that trains weights, and training needs hardware your Mac doesn't have. Colab is the workaround, not extra credit.</p>
+
+  <h2>What's actually different in the Colab notebook</h2>
+  <p>You have a second file — <code>ColabVersion__01_Reasoning_Fine_Tuning_Unsloth_GRPO.ipynb</code> — and its own markdown cell spells out exactly what changes. Real text from that cell:</p>
+  <div class="code-file">from ColabVersion__..., cell 1</div>
+  <pre>- You will need a Google Colab Pro account. If you do not already have one, set it up now.
+- Colab uses `%pip install` instead of `uv sync`
+- This notebook has been successfully run using:
+  - The ungated `unsloth/Llama-3.2-3B-Instruct` mirror rather than the HuggingFace licensed version.
+  - the GRPOConfig `report_to` parameter set to "none" instead of "wandb"
+- The notebook was run using an `L4/A100` runtime.</pre>
+  <table>
+    <tr><th>Difference</th><th>Why</th></tr>
+    <tr><td>Needs Colab <strong>Pro</strong>, not the free tier</td><td>Free Colab often hands out weaker/older GPUs that don't meet the Ampere+ requirement from the README</td></tr>
+    <tr><td><code>%pip install</code> instead of <code>uv sync</code></td><td><code>uv sync</code> reads a local project file that doesn't exist inside a Colab session — Colab installs packages directly into its own temporary machine</td></tr>
+    <tr><td>Uses the <strong>ungated</strong> <code>unsloth/Llama-3.2-3B-Instruct</code> mirror</td><td>Skips waiting on Meta's license-approval email — one less thing to block a class session</td></tr>
+    <tr><td><code>!nvidia-smi</code> + a GPU compute-capability check near the top</td><td>Confirms Colab actually handed you a strong enough GPU this session, before you waste time on the rest</td></tr>
+  </table>
+  <p>Everything else — LoRA, the dataset, the reward functions, GRPO itself — is identical code. Colab only changes <em>where</em> it runs, never <em>what</em> it's doing.</p>
+
+  <h2>The activity, simplified</h2>
+  <p>Stripping away every code detail, here's the actual ask, straight from the README's "Main Assignment" section, in plain words:</p>
+  <div class="box analogy">
+    <span class="box-label">One sentence</span>
+    Take a chat model that's just okay at math, and use reward-based training — grading its own self-generated attempts against a hidden answer key, never training it to copy a worked solution — to make it noticeably better at solving grade-school math problems and showing its work. Then prove it actually worked by comparing its answers before and after, and demonstrate you understood <em>why</em> it worked by answering 4 short questions.
+  </div>
+
+  <div class="box callout">
+    <span class="box-label">Wait — doesn't GSM8K give us the answers? Isn't that "showing examples"?</span>
+    Good catch if you're asking this. GSM8K gives the model a <strong>question</strong> — every training method needs that — and gives the <em>reward function</em> a hidden <strong>gold answer</strong>, used only to grade the model's guess afterward. The model itself never sees that gold answer; look at Lesson 0008's <code>correctness_reward_func(prompts, completions, answer, **kwargs)</code> — <code>answer</code> is received by the grading code, never passed to the model. What's genuinely missing is a <em>worked solution</em> to copy — that's the one thing supervised fine-tuning would show and GRPO deliberately doesn't. Think closed-book exam: you get the question, you write your own answer from a blank page, and only afterward does someone check it against an answer key you never had access to.
+  </div>
+  <p>That's it. Tasks 1–9 are the "make it happen" steps (Lessons 0000–0008 covered all of them). Questions #1–4 are the "prove you understood it" part — let's take a first pass at those now.</p>
+
+  <h2>A first pass at the 4 questions</h2>
+  <div class="box callout">
+    <span class="box-label">Before you paste anything into the notebook</span>
+    These are drafts to help you see the shape of a strong answer — the notebook wants <em>your own words</em>, not mine. Read each one, then rewrite it the way you'd actually say it.
+  </div>
+
+  <h3>Question #1 — double quantization, and why 16-bit here</h3>
+  <p><em>Asks:</em> what gets quantized a second time in QLoRA, how much memory does that save, and why does this notebook use 16-bit instead?</p>
+  <p><strong>Draft:</strong> Normal quantization needs small "scaling constants" to reconstruct the compressed numbers accurately — one constant per small block of weights. Double quantization compresses <em>those constants themselves</em> a second time, saving roughly 0.37 bits per parameter (this exact figure is stated in the notebook's own Task 2 text). This notebook skips QLoRA anyway and trains 16-bit, because GRPO's real bottleneck is generation speed, not memory — every 4-bit weight has to be decompressed before the GPU can use it (Lesson 0001's zip-file idea), and that tax adds up fast when you're generating 8 completions per question, every step. QLoRA is still the right call when GPU memory itself is the hard limit, not generation speed.</p>
+
+  <h3>Question #2 — labeling the architecture diagram</h3>
+  <p><em>Asks:</em> using your own <code>print(model)</code> output from Task 3, label a diagram with the matching layer names.</p>
+  <div class="box citation">
+    <span class="box-label">This one genuinely needs your own output</span>
+    I can't draft this one — it depends on the exact text your <code>print(model)</code> cell produces when you run it. What I can give you is the method: Lesson 0002 walks through exactly which real class names map to which part of the diagram (<code>embed_tokens</code>, <code>self_attn</code> with <code>q/k/v/o_proj</code>, <code>mlp</code> with <code>gate/up/down_proj</code>, <code>lm_head</code>). Run Task 3, then paste your actual printout to your teaching agent if any line is confusing.
+  </div>
+
+  <h3>Question #3 — what LoRA is doing, in your own words</h3>
+  <p><em>Asks:</em> a plain description of what LoRA does.</p>
+  <p><strong>Draft:</strong> LoRA freezes the model's original weights completely and instead trains two small matrices, <code>A</code> and <code>B</code>. Multiplied together, they form a small correction the same shape as the original weight, and the model actually uses <code>original weight + correction</code>. Only <code>A</code> and <code>B</code> ever get updated — a tiny fraction of the model's real size — which is what makes fine-tuning this cheap.</p>
+
+  <h3>Question #4 — warmup_ratio, learning_rate, lr_scheduler_type</h3>
+  <p><em>Asks:</em> describe what these three training settings do.</p>
+  <p><strong>Draft:</strong> <code>learning_rate</code> controls how big each update step is — too high overshoots, too low crawls. <code>warmup_ratio</code> is the fraction of training spent easing into the full learning rate gradually at the start, instead of applying it at full strength immediately, which keeps early training stable. <code>lr_scheduler_type = "cosine"</code> describes the shape of the learning rate over the whole run — it ramps up during warmup, then eases back down smoothly along a cosine curve toward the end, rather than stopping abruptly.</p>
+
+  <div class="box callout">
+    <span class="box-label">Primary source</span>
+    The README's own "Submitting Your Homework" section has the exact git steps (pull upstream, commit, push, submit the GitHub URL) — worth a re-read once you're actually done, since that part hasn't been covered anywhere in these lessons.
+  </div>
+
+  <div class="ask-agent">
+    💬 Once you've rewritten any of these drafts in your own words, paste them back to your teaching agent and ask if they'd hold up — that's a much better check than guessing.
+  </div>
+
+  <div class="lesson-nav">
+    <a href="0009-designing-rewards-without-ground-truth.html">← Designing Rewards Without Ground Truth</a>
+    <a href="0011-your-actual-run.html">Next: Your Actual Run →</a>
+  </div>
+</div>
+<script src="../assets/interactions.js"></script>

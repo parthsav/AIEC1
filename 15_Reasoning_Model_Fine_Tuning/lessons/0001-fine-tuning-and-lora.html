@@ -1,0 +1,172 @@
+<title>Fine-Tuning &amp; LoRA — Reasoning Model Fine-Tuning</title>
+<link rel="stylesheet" href="../assets/base.css">
+<div class="page">
+
+  <div class="crumbs"><a href="index.html">All lessons</a> · <a href="0000-big-picture.html">← Big Picture</a> · <a href="../reference/0001-grpo-cheatsheet.html">Cheat sheet</a></div>
+
+  <p class="kicker">Lesson 0001 · Fine-Tuning &amp; LoRA</p>
+  <h1>Sticky Notes on a Textbook You Can't Rewrite</h1>
+
+  <div class="box analogy">
+    <span class="box-label">Analogy first</span>
+    Picture a massive, printed textbook — 3 billion words, one per tiny fact. You are <strong>not allowed to reprint it</strong> (too expensive, too slow). But you're allowed to stick thin correction notes onto a few key pages. Readers see the original page <em>plus</em> your note layered on top. That note is <strong>LoRA</strong> — Low-Rank Adaptation.
+  </div>
+
+  <p>A model's "knowledge" lives in giant grids of numbers called <strong>weight matrices</strong>. Full fine-tuning means changing every number in every grid — for a 3-billion-parameter model, that is 3 billion numbers to track gradients for, which needs a lot of GPU memory. Almost nobody with one GPU can do that.</p>
+
+  <h2>What LoRA actually adds</h2>
+  <p>For one big frozen matrix <code>W</code>, LoRA trains two small matrices, <code>A</code> and <code>B</code>. Multiplied together, <code>B × A</code> makes a "correction grid" the same size as <code>W</code> — and the model uses <code>W + B×A</code> instead of just <code>W</code>. Only <code>A</code> and <code>B</code> ever get updated.</p>
+
+  <div class="visual">
+    <p class="visual-label">Illustration — frozen weight + trainable patch</p>
+    <svg viewBox="0 0 640 260" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Diagram of LoRA: frozen big matrix W plus a low-rank correction B times A">
+      <style>
+        .lbl { font: 600 12px -apple-system, sans-serif; fill: var(--ink); }
+        .sub { font: 400 10px -apple-system, sans-serif; fill: var(--ink-soft); }
+        .frozen { fill: var(--paper); stroke: var(--ink-soft); stroke-width: 1.5; stroke-dasharray: 4,3; }
+        .train { fill: var(--accent-soft); stroke: var(--accent); stroke-width: 1.5; }
+        .grid-line { stroke: var(--rule); stroke-width: 1; }
+        .flow { stroke: var(--ink-soft); stroke-width: 1.5; marker-end: url(#lora-arrow); fill:none; }
+        .glow { animation: loraGlow 3s infinite; }
+        @keyframes loraGlow {
+          0%, 100% { stroke-width: 1.5; }
+          50% { stroke-width: 3; }
+        }
+      </style>
+      <defs>
+        <marker id="lora-arrow" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto">
+          <path d="M0,0 L8,4 L0,8 Z" fill="var(--ink-soft)"></path>
+        </marker>
+      </defs>
+
+      <!-- W frozen big matrix -->
+      <rect class="frozen" x="20" y="30" width="130" height="130" rx="6"></rect>
+      <text class="lbl" x="85" y="18" text-anchor="middle">W (frozen)</text>
+      <text class="sub" x="85" y="178" text-anchor="middle">🔒 3 billion numbers</text>
+      <text class="sub" x="85" y="192" text-anchor="middle">never touched</text>
+
+      <text class="lbl" x="180" y="100" text-anchor="middle">+</text>
+
+      <!-- A thin tall -->
+      <rect class="train glow" x="205" y="30" width="30" height="130" rx="4"></rect>
+      <text class="lbl" x="220" y="18" text-anchor="middle">A</text>
+
+      <text class="lbl" x="248" y="100" text-anchor="middle">×</text>
+
+      <!-- B thin wide -->
+      <rect class="train glow" x="265" y="90" width="130" height="30" rx="4"></rect>
+      <text class="lbl" x="330" y="78" text-anchor="middle">B</text>
+      <text class="sub" x="330" y="140" text-anchor="middle">rank r = 64 — thin on purpose</text>
+      <text class="sub" x="330" y="153" text-anchor="middle">only these get gradients</text>
+
+      <text class="lbl" x="420" y="100" text-anchor="middle">=</text>
+
+      <!-- result matrix -->
+      <rect class="frozen" x="445" y="30" width="130" height="130" rx="6"></rect>
+      <text class="lbl" x="510" y="18" text-anchor="middle">W + BA (used)</text>
+      <text class="sub" x="510" y="178" text-anchor="middle">what the model</text>
+      <text class="sub" x="510" y="192" text-anchor="middle">actually runs with</text>
+
+      <path class="flow" d="M150,95 L200,95"></path>
+      <path class="flow" d="M400,95 L440,95"></path>
+    </svg>
+  </div>
+  <p class="visual-caption">The two thin strips (A and B) are the only pieces glowing — they're the only trainable part. Multiplied together they form a correction the same shape as the giant frozen matrix, and get added on top of it.</p>
+
+  <h2>Why "low-rank" makes this cheap</h2>
+  <p>A full correction grid the size of <code>W</code> would cost as much to train as <code>W</code> itself. But <code>A</code> and <code>B</code> are deliberately thin — their shared inner dimension, <strong>rank <code>r</code></strong>, is tiny (64 here) compared to the matrix's real size. Thin matrices means far fewer numbers to train, at the cost of a slightly less expressive correction. Higher <code>r</code> = more capacity, more VRAM, more time.</p>
+
+  <div class="box citation">
+    <span class="box-label">Where this lives in your notebook</span>
+    <strong>Task 3</strong>, cell defining <code>FastLanguageModel.get_peft_model(...)</code>:
+    <pre><span class="hl">r = lora_rank,           # 64 — the "thinness" of A and B</span>
+target_modules = [
+    "q_proj", "k_proj", "v_proj", "o_proj",     # attention
+    "gate_proj", "up_proj", "down_proj",         # feed-forward
+],
+lora_alpha = lora_rank,  # scales the correction; alpha = r is a stable default</pre>
+    Those seven names are <em>which</em> weight matrices get a sticky note. Lesson 0002 explains what attention and feed-forward layers actually are.
+  </div>
+
+  <h2>One more choice: 16-bit vs. 4-bit (QLoRA)</h2>
+  <p><strong>Quantization</strong> stores each number using fewer bits — like rounding "3.14159265" down to "3.14" to save space. <strong>QLoRA</strong> combines that trick with LoRA to fit huge models into tiny GPUs. This notebook deliberately <em>skips</em> it and trains in full 16-bit, because GRPO's bottleneck isn't memory — it's <em>generation speed</em> (remember, it generates 8 completions per question, every step), and 16-bit weights generate fastest.</p>
+
+  <div class="box analogy">
+    <span class="box-label">Analogy — why fewer bits can be slower</span>
+    A 4-bit weight is like a <strong>zipped file</strong>: smaller to store, but your computer has to unzip it before it can actually use it. A 16-bit weight is already unzipped — bigger, but ready to go. GPUs can only do their math (matrix multiplication) in 16-bit-ish formats, so a 4-bit weight has to be decompressed back to 16-bit <em>right before every single calculation</em>. That's a tiny tax — but GRPO generates 8 completions per question, over 175+ steps, so that tiny tax gets paid an enormous number of times.
+  </div>
+
+  <div class="visual">
+    <p class="visual-label">Illustration — the hidden decompression step</p>
+    <svg viewBox="0 0 640 190" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Diagram comparing a 4-bit weight that must decompress before every GPU calculation, versus a 16-bit weight that is ready immediately">
+      <style>
+        .lbl { font: 600 12px -apple-system, sans-serif; fill: var(--ink); }
+        .s { font: 400 10px -apple-system, sans-serif; fill: var(--ink-soft); }
+        .small { fill: var(--accent-soft); stroke: var(--accent); stroke-width: 1.5; }
+        .big { fill: var(--good-soft); stroke: var(--good); stroke-width: 1.5; }
+        .tax { fill: var(--bad-soft); stroke: var(--bad); stroke-width: 1.5; stroke-dasharray: 3,2; }
+        .gpu { fill: var(--paper-raised); stroke: var(--ink-soft); stroke-width: 1.5; }
+        .arr { stroke: var(--ink-soft); stroke-width: 1.5; marker-end: url(#a4); fill: none; }
+      </style>
+      <defs><marker id="a4" markerWidth="7" markerHeight="7" refX="5" refY="3.5" orient="auto"><path d="M0,0 L7,3.5 L0,7 Z" fill="var(--ink-soft)"></path></marker></defs>
+
+      <!-- 4-bit path -->
+      <rect class="small" x="10" y="20" width="90" height="40" rx="6"></rect>
+      <text class="lbl" x="55" y="45" text-anchor="middle" font-size="11">4-bit (zipped)</text>
+      <path class="arr" d="M100,40 L135,40"></path>
+      <rect class="tax" x="135" y="20" width="110" height="40" rx="6"></rect>
+      <text class="lbl" x="190" y="38" text-anchor="middle" font-size="10">decompress</text>
+      <text class="s" x="190" y="52" text-anchor="middle" font-size="9">(extra step, every time)</text>
+      <path class="arr" d="M245,40 L280,40"></path>
+      <rect class="gpu" x="280" y="20" width="90" height="40" rx="6"></rect>
+      <text class="lbl" x="325" y="45" text-anchor="middle" font-size="11">GPU math</text>
+      <text class="s" x="190" y="80" text-anchor="middle">paid 8 completions × 175+ steps = a lot</text>
+
+      <!-- 16-bit path -->
+      <rect class="big" x="10" y="120" width="90" height="40" rx="6"></rect>
+      <text class="lbl" x="55" y="145" text-anchor="middle" font-size="11">16-bit (unzipped)</text>
+      <path class="arr" d="M100,140 L280,140"></path>
+      <rect class="gpu" x="280" y="120" width="90" height="40" rx="6"></rect>
+      <text class="lbl" x="325" y="145" text-anchor="middle" font-size="11">GPU math</text>
+      <text class="s" x="190" y="180" text-anchor="middle">no decompression step — straight to work</text>
+    </svg>
+  </div>
+  <p class="visual-caption">Same destination (GPU math), but the 4-bit path has an extra stop every single time. One decompression is nothing; paying it thousands of times during GRPO's constant sampling is what makes it slower.</p>
+
+  <div class="compare">
+    <div class="col yes">
+      <h4>16-bit LoRA (this notebook)</h4>
+      More memory used, but no decompression tax — fastest when generation speed is the bottleneck, exactly GRPO's situation.
+    </div>
+    <div class="col no">
+      <h4>QLoRA (4-bit)</h4>
+      Less memory used, but pays a decompression tax on every calculation — worth it only when GPU memory itself is the hard limit (e.g. squeezing a big model onto an 8&nbsp;GB card).
+    </div>
+  </div>
+
+  <div class="quiz">
+    <p class="q">Quick check: what do A and B multiplied together approximate?</p>
+    <div class="choices" data-quiz data-wrong-msg="Not quite — re-read the diagram above: only A and B move.">
+      <button class="choice" data-correct="false">the original frozen weights exactly</button>
+      <button class="choice" data-correct="true" data-right-msg="Right. W stays frozen; B×A is the only thing that changes.">a small correction added to the weights</button>
+      <button class="choice" data-correct="false">a compressed copy of the whole model</button>
+      <button class="choice" data-correct="false">the reward for each completion tried</button>
+    </div>
+    <p class="feedback"></p>
+  </div>
+
+  <div class="box callout">
+    <span class="box-label">Primary source</span>
+    <a href="https://arxiv.org/abs/2106.09685" target="_blank" rel="noopener">LoRA: Low-Rank Adaptation of Large Language Models</a> (the original paper) — Section 4.1 has the exact <code>W + BA</code> formula. For the quantization side, see the <a href="https://arxiv.org/abs/2305.14314" target="_blank" rel="noopener">QLoRA paper</a>, which is what Question #1 in your notebook is asking about.
+  </div>
+
+  <div class="ask-agent">
+    💬 Ask your teaching agent: "why is alpha set equal to r in this notebook?" or anything else that's fuzzy.
+  </div>
+
+  <div class="lesson-nav">
+    <a href="0000-big-picture.html">← Big Picture</a>
+    <a href="0002-transformer-anatomy.html">Next: Transformer Anatomy →</a>
+  </div>
+</div>
+<script src="../assets/interactions.js"></script>

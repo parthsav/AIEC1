@@ -1,0 +1,109 @@
+<title>Reinforcement Learning Basics — Reasoning Model Fine-Tuning</title>
+<link rel="stylesheet" href="../assets/base.css">
+<div class="page">
+
+  <div class="crumbs"><a href="index.html">All lessons</a> · <a href="0002-transformer-anatomy.html">← Transformer Anatomy</a> · <a href="../reference/0001-grpo-cheatsheet.html">Cheat sheet</a></div>
+
+  <p class="kicker">Lesson 0003 · Reinforcement Learning Basics</p>
+  <h1>Learning to Cook With No Recipe, Only a Food Critic</h1>
+
+  <div class="box analogy">
+    <span class="box-label">Analogy first</span>
+    You're learning to make a new dish with no recipe. A food critic tastes your attempt and gives it a score out of 10 — nothing else, no tips. Next time you cook, you adjust based only on that score: more salt scored well last time, so you try more salt again. Repeat for weeks, and you converge on a good dish — without anyone ever telling you the steps.
+  </div>
+
+  <p>That's <strong>reinforcement learning (RL)</strong>: improve by trying things and getting scored, not by copying a shown example. Three words carry all the weight:</p>
+
+  <table>
+    <tr><th>Term</th><th>In the cooking story</th><th>In this notebook</th></tr>
+    <tr><td><strong>Policy</strong></td><td>your current way of cooking</td><td>the model's current weights — literally its current habit of generating text</td></tr>
+    <tr><td><strong>Action</strong></td><td>one attempt at the dish</td><td>one completion the model generates for a question</td></tr>
+    <tr><td><strong>Reward</strong></td><td>the critic's score</td><td>a number from a reward function (Lesson 0005)</td></tr>
+  </table>
+
+  <p>"Policy" is the one word worth sitting with: it does <em>not</em> mean a rulebook someone wrote. It means <strong>the model itself, right now</strong> — its current tendency to produce certain words over others. Training doesn't rewrite rules; it nudges that tendency.</p>
+
+  <div class="visual">
+    <p class="visual-label">Animation — a policy shifting toward what scores well</p>
+    <svg viewBox="0 0 640 260" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Bar chart animation showing a policy's preference shifting toward the higher-reward strategy over three rounds">
+      <style>
+        .axis { stroke: var(--rule); stroke-width: 1; }
+        .lbl { font: 600 12px -apple-system, sans-serif; fill: var(--ink); }
+        .s { font: 400 10px -apple-system, sans-serif; fill: var(--ink-soft); }
+        .barA { fill: var(--good); animation: growA 9s infinite; }
+        .barB { fill: var(--ink-soft); animation: growB 9s infinite; }
+        .barC { fill: var(--bad); animation: growC 9s infinite; }
+        @keyframes growA { 0%,5% { height: 40px; y: 170px; } 40%,50% { height: 90px; y: 120px; } 90%,100% { height: 150px; y: 60px; } }
+        @keyframes growB { 0%,5% { height: 80px; y: 130px; } 40%,50% { height: 55px; y: 155px; } 90%,100% { height: 30px; y: 180px; } }
+        @keyframes growC { 0%,5% { height: 90px; y: 120px; } 40%,50% { height: 45px; y: 165px; } 90%,100% { height: 10px; y: 200px; } }
+        .round { font: 600 13px -apple-system, sans-serif; fill: var(--accent); animation: roundFade 9s infinite; opacity: 0; }
+        .r1 { animation-delay: 0s; }
+        .r2 { animation-delay: 3s; }
+        .r3 { animation-delay: 6s; }
+        @keyframes roundFade { 0%,2% {opacity:0;} 4%,30% {opacity:1;} 33%,100% {opacity:0;} }
+      </style>
+      <line class="axis" x1="60" y1="210" x2="600" y2="210"></line>
+      <text class="round r1" x="320" y="30" text-anchor="middle">Round 1 — try all three roughly equally</text>
+      <text class="round r2" x="320" y="30" text-anchor="middle">Round 2 — "more salt" scored higher, lean toward it</text>
+      <text class="round r3" x="320" y="30" text-anchor="middle">Round 3 — policy now strongly prefers the winner</text>
+
+      <rect class="barA" x="140" y="170" width="70" height="40"></rect>
+      <text class="lbl" x="175" y="225" text-anchor="middle">more salt</text>
+      <text class="s" x="175" y="240" text-anchor="middle">(scored well)</text>
+
+      <rect class="barB" x="300" y="130" width="70" height="80"></rect>
+      <text class="lbl" x="335" y="225" text-anchor="middle">less time</text>
+      <text class="s" x="335" y="240" text-anchor="middle">(scored ok)</text>
+
+      <rect class="barC" x="460" y="120" width="70" height="90"></rect>
+      <text class="lbl" x="495" y="225" text-anchor="middle">more spice</text>
+      <text class="s" x="495" y="240" text-anchor="middle">(scored poorly)</text>
+    </svg>
+  </div>
+  <p class="visual-caption">The bars are how <em>likely</em> the policy is to try each strategy again. Nobody hand-picked "more salt" as correct — it simply scored best, so the policy leans toward it more with every round.</p>
+
+  <h2>Why not just show it good reasoning? (SFT vs. RL)</h2>
+  <p>Session 15's title says "reasoning model," so why not collect thousands of worked math solutions and train the model to copy them — the same supervised approach used elsewhere in this course? Two practical reasons this notebook doesn't:</p>
+
+  <div class="compare">
+    <div class="col no">
+      <h4>Copying worked examples (SFT)</h4>
+      Someone has to <em>write</em> thousands of good step-by-step reasoning traces by hand — slow, expensive, and the human's reasoning style may not even be the best one for this model.
+    </div>
+    <div class="col yes">
+      <h4>Rewarding checkable answers (RL / GRPO)</h4>
+      GSM8K already has a final numeric answer for every question. Checking "is this number right?" is nearly free — no reasoning trace needed at all.
+    </div>
+  </div>
+
+  <div class="box citation">
+    <span class="box-label">Where this lives in your notebook</span>
+    <strong>Task 4</strong>'s markdown cell says it directly: <em>"Notice something odd about the data: it is just questions and final answers — no reasoning traces... That is the point."</em> Look at <code>get_gsm8k_questions()</code> — it only ever extracts the answer after <code>####</code>, never a reasoning trace.
+  </div>
+
+  <div class="quiz">
+    <p class="q">Quick check: in this notebook, what plays the role of the "policy" from the cooking story?</p>
+    <div class="choices" data-quiz data-wrong-msg="Not quite. The policy is the thing being trained — the model's current tendencies, not the data or the rubric.">
+      <button class="choice" data-correct="false">the GSM8K dataset of questions</button>
+      <button class="choice" data-correct="true" data-right-msg="Right. The policy is whatever the model currently tends to generate — here, specifically the LoRA-patched part of it.">the model's current weights right now</button>
+      <button class="choice" data-correct="false">the food critic's scoring rubric</button>
+      <button class="choice" data-correct="false">the frozen base model weights</button>
+    </div>
+    <p class="feedback"></p>
+  </div>
+
+  <div class="box callout">
+    <span class="box-label">Primary source</span>
+    <a href="https://spinningup.openai.com/en/latest/spinningup/rl_intro.html" target="_blank" rel="noopener">OpenAI Spinning Up — "Part 1: Key Concepts in RL"</a>. It's written for researchers, but the first third (policy, reward, trajectory) is exactly this lesson with more precision.
+  </div>
+
+  <div class="ask-agent">
+    💬 Ask your teaching agent: "what's the difference between a reward and an advantage?" — that question is exactly where Lesson 0004 picks up.
+  </div>
+
+  <div class="lesson-nav">
+    <a href="0002-transformer-anatomy.html">← Transformer Anatomy</a>
+    <a href="0004-grpo-algorithm.html">Next: The GRPO Algorithm →</a>
+  </div>
+</div>
+<script src="../assets/interactions.js"></script>

@@ -1,0 +1,223 @@
+<title>Transformer Anatomy — Reasoning Model Fine-Tuning</title>
+<link rel="stylesheet" href="../assets/base.css">
+<div class="page">
+
+  <div class="crumbs"><a href="index.html">All lessons</a> · <a href="0001-fine-tuning-and-lora.html">← Fine-Tuning &amp; LoRA</a> · <a href="../reference/0001-grpo-cheatsheet.html">Cheat sheet</a></div>
+
+  <p class="kicker">Lesson 0002 · Transformer Anatomy</p>
+  <h1>What Is LoRA Actually Patching?</h1>
+
+  <p>Lesson 0001 said LoRA sticks a note onto "a few key weight matrices." This lesson answers: which matrices, and what do they do? You'll need this to answer <strong>Question #2</strong> in your notebook, which asks you to label a real architecture diagram using your model's own <code>print(model)</code> output.</p>
+
+  <div class="box analogy">
+    <span class="box-label">Analogy first</span>
+    Imagine you're telling a friend a made-up story out loud, one word at a time — you don't know the next word until the moment you say it. Before every new word, you quickly glance back over everything you've <em>already</em> said, think for a second, then say the next word. That's it. That's basically all a model does, five small habits repeated over and over. Let's watch it happen, one word at a time, using one sentence: <em>"Emma had 3 cats. She..."</em>
+  </div>
+
+  <p>Click through the steps below — each one is a single habit in that process.</p>
+
+  <div class="visual">
+    <p class="visual-label">Step-through — one word of the story</p>
+    <div class="stepper" id="anatomy-stepper">
+      <div class="step active" data-step="1">
+        <svg viewBox="0 0 600 160" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Turning a word into a private note">
+          <style>.b{fill:var(--accent-soft);stroke:var(--accent);stroke-width:1.5;} .t{font:600 13px -apple-system,sans-serif;fill:var(--ink);} .s{font:400 11px -apple-system,sans-serif;fill:var(--ink-soft);}</style>
+          <rect class="b" x="40" y="50" width="180" height="60" rx="8"></rect>
+          <text class="t" x="130" y="75" text-anchor="middle">"Emma"</text>
+          <text class="s" x="130" y="93" text-anchor="middle">the word you just said</text>
+          <text class="t" x="300" y="70" text-anchor="middle">→</text>
+          <rect class="b" x="360" y="50" width="200" height="60" rx="8"></rect>
+          <text class="t" x="460" y="72" text-anchor="middle">"a person — probably</text>
+          <text class="t" x="460" y="88" text-anchor="middle">the subject of this story"</text>
+          <text class="s" x="460" y="104" text-anchor="middle">your own private note about it</text>
+        </svg>
+        <p class="visual-caption"><strong>1. Make a private note.</strong> You don't keep the raw word around — you keep a quick mental note of what it means and why it matters. The model does the same thing, in numbers instead of words. This is called <code>embed_tokens</code>.</p>
+      </div>
+      <div class="step" data-step="2">
+        <svg viewBox="0 0 600 190" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Glancing back at earlier notes: the word She checking back to find what it refers to">
+          <style>.b{fill:var(--accent-soft);stroke:var(--accent);stroke-width:1.5;} .b2{fill:var(--paper);stroke:var(--rule);stroke-width:1.3;} .t{font:600 13px -apple-system,sans-serif;fill:var(--ink);} .s{font:400 10px -apple-system,sans-serif;fill:var(--ink-soft);} .strong{stroke:var(--good);stroke-width:3;fill:none;marker-end:url(#a2s);} .weak{stroke:var(--ink-soft);stroke-width:1;stroke-dasharray:3,3;fill:none;marker-end:url(#a2w);}</style>
+          <defs>
+            <marker id="a2s" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 Z" fill="var(--good)"></path></marker>
+            <marker id="a2w" markerWidth="7" markerHeight="7" refX="5" refY="3.5" orient="auto"><path d="M0,0 L7,3.5 L0,7 Z" fill="var(--ink-soft)"></path></marker>
+          </defs>
+          <rect class="b2" x="20" y="90" width="90" height="40" rx="6"></rect><text class="t" x="65" y="115" text-anchor="middle">Emma</text>
+          <rect class="b2" x="150" y="90" width="90" height="40" rx="6"></rect><text class="t" x="195" y="115" text-anchor="middle">had</text>
+          <rect class="b2" x="280" y="90" width="90" height="40" rx="6"></rect><text class="t" x="325" y="115" text-anchor="middle">3 cats</text>
+          <rect class="b" x="450" y="20" width="110" height="40" rx="6"></rect><text class="t" x="505" y="45" text-anchor="middle">"She..."</text>
+          <path class="strong" d="M480,60 C480,80 90,95 65,88"></path>
+          <text class="s" x="270" y="60" text-anchor="middle" fill="var(--good)" font-weight="700">glances back here</text>
+          <path class="weak" d="M500,60 C500,90 200,100 195,88"></path>
+          <path class="weak" d="M520,60 C520,95 330,100 325,88"></path>
+          <text class="s" x="300" y="150" text-anchor="middle">about to say "She" — you glance back over your own notes</text>
+          <text class="s" x="300" y="170" text-anchor="middle">mostly you need "Emma," barely "had" or "3 cats"</text>
+        </svg>
+        <p class="visual-caption"><strong>2. Glance back at what you already said.</strong> Before picking the next word, you check your own earlier notes for what's actually relevant. About to say "She"? You check back and land on "Emma" — that's who you mean. The next step unpacks exactly how that "glancing back" works.</p>
+      </div>
+      <div class="step" data-step="3">
+        <svg viewBox="0 0 600 220" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Every note has a label and content; a question is compared against every label, then the best-matching content is blended into one output">
+          <style>.b{fill:var(--accent-soft);stroke:var(--accent);stroke-width:1.5;} .lbl2{fill:var(--paper-raised);stroke:var(--rule);stroke-width:1;} .t{font:600 11px -apple-system,sans-serif;fill:var(--ink);} .tt{font:700 10px -apple-system,sans-serif;fill:var(--accent);} .s{font:400 9.5px -apple-system,sans-serif;fill:var(--ink-soft);} .q{fill:var(--good-soft);stroke:var(--good);stroke-width:1.5;} .match{stroke:var(--good);stroke-width:2.5;fill:none;marker-end:url(#a2m);} .nomatch{stroke:var(--ink-soft);stroke-width:1;stroke-dasharray:2,2;fill:none;marker-end:url(#a2n);}</style>
+          <defs>
+            <marker id="a2m" markerWidth="7" markerHeight="7" refX="5" refY="3.5" orient="auto"><path d="M0,0 L7,3.5 L0,7 Z" fill="var(--good)"></path></marker>
+            <marker id="a2n" markerWidth="6" markerHeight="6" refX="4" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="var(--ink-soft)"></path></marker>
+          </defs>
+          <rect class="q" x="20" y="15" width="200" height="40" rx="6"></rect>
+          <text class="t" x="120" y="34" text-anchor="middle" font-size="10">your question (query):</text>
+          <text class="t" x="120" y="48" text-anchor="middle" font-size="10">"who does 'she' refer to?"</text>
+
+          <!-- note cards: label on top, content below -->
+          <rect class="lbl2" x="20" y="90" width="130" height="70" rx="6"></rect>
+          <text class="tt" x="85" y="106" text-anchor="middle">label: "a person, subject"</text>
+          <text class="s" x="85" y="122" text-anchor="middle">content: Emma, owns cats,</text>
+          <text class="s" x="85" y="134" text-anchor="middle">main character so far</text>
+          <text class="t" x="85" y="152" text-anchor="middle" font-size="10">— note: "Emma"</text>
+
+          <rect class="lbl2" x="170" y="90" width="120" height="70" rx="6"></rect>
+          <text class="tt" x="230" y="106" text-anchor="middle" font-size="9.5">label: "an action"</text>
+          <text class="s" x="230" y="122" text-anchor="middle">content: possession,</text>
+          <text class="s" x="230" y="134" text-anchor="middle">past tense</text>
+          <text class="t" x="230" y="152" text-anchor="middle" font-size="10">— note: "had"</text>
+
+          <rect class="lbl2" x="310" y="90" width="120" height="70" rx="6"></rect>
+          <text class="tt" x="370" y="106" text-anchor="middle" font-size="9.5">label: "a number"</text>
+          <text class="s" x="370" y="122" text-anchor="middle">content: quantity = 3</text>
+          <text class="t" x="370" y="152" text-anchor="middle" font-size="10">— note: "3 cats"</text>
+
+          <path class="match" d="M100,55 C90,70 85,75 85,88"></path>
+          <path class="nomatch" d="M150,55 C200,75 230,80 230,88"></path>
+          <path class="nomatch" d="M180,55 C300,80 370,85 370,88"></path>
+
+          <rect class="q" x="450" y="90" width="130" height="70" rx="6"></rect>
+          <text class="t" x="515" y="112" text-anchor="middle" font-size="10">output (blended):</text>
+          <text class="t" x="515" y="128" text-anchor="middle" font-size="10">"she = Emma"</text>
+          <path class="match" d="M150,120 C300,120 400,125 448,125"></path>
+
+          <text class="s" x="300" y="195" text-anchor="middle">query vs. every label picks what's relevant; then their content blends into one output</text>
+          <text class="s" x="300" y="210" text-anchor="middle">query = q_proj · label = k_proj · content = v_proj · blended output = o_proj</text>
+        </svg>
+        <p class="visual-caption"><strong>3. What "glancing back" is really doing.</strong> Every note has a <em>label</em> (what it's about) and <em>content</em> (the detail). Your question gets compared against every label to find the best match, then you actually read that note's content and blend it into one clean output. Four jobs, four names: <strong>Query</strong> (<code>q_proj</code>) asks, <strong>Key</strong> (<code>k_proj</code>) is the label, <strong>Value</strong> (<code>v_proj</code>) is the content, <strong>Output</strong> (<code>o_proj</code>) is the clean blend — the same four names you patched with LoRA in Lesson 0001, and together they make up <code>self_attn</code>.</p>
+      </div>
+      <div class="step" data-step="4">
+        <svg viewBox="0 0 600 190" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="You can only glance back at words already said, never words not yet made up">
+          <style>.b{fill:var(--accent-soft);stroke:var(--accent);stroke-width:1.5;} .lock{fill:var(--paper);stroke:var(--rule);stroke-width:1.3;stroke-dasharray:3,2;} .t{font:600 12px -apple-system,sans-serif;fill:var(--ink);} .s{font:400 10px -apple-system,sans-serif;fill:var(--ink-soft);} .ok{font:700 13px -apple-system,sans-serif;fill:var(--good);} .no{font:700 13px -apple-system,sans-serif;fill:var(--bad);}</style>
+          <text class="t" x="30" y="25" text-anchor="start" font-size="11">you've said "Emma had 3 cats" — what can you glance back at?</text>
+          <rect class="b" x="20" y="45" width="90" height="40" rx="6"></rect><text class="t" x="65" y="70" text-anchor="middle">1 Emma</text>
+          <rect class="b" x="130" y="45" width="90" height="40" rx="6"></rect><text class="t" x="175" y="70" text-anchor="middle">2 had</text>
+          <rect class="b" x="240" y="45" width="90" height="40" rx="6"></rect><text class="t" x="285" y="70" text-anchor="middle">3 (3)</text>
+          <rect class="b" x="350" y="45" width="90" height="40" rx="6"></rect><text class="t" x="395" y="70" text-anchor="middle">4 cats</text>
+          <rect class="lock" x="460" y="45" width="120" height="40" rx="6"></rect><text class="s" x="520" y="70" text-anchor="middle">5 (not said yet!)</text>
+          <text class="ok" x="65" y="115" text-anchor="middle">✓</text>
+          <text class="ok" x="175" y="115" text-anchor="middle">✓</text>
+          <text class="ok" x="285" y="115" text-anchor="middle">✓</text>
+          <text class="ok" x="395" y="115" text-anchor="middle">✓ (itself)</text>
+          <text class="no" x="520" y="115" text-anchor="middle">✗ can't — doesn't exist</text>
+          <text class="s" x="300" y="150" text-anchor="middle">you can only glance back at words 1–4 — word 5 hasn't been made up yet</text>
+          <text class="s" x="300" y="170" text-anchor="middle">not a rule someone imposed — there is simply nothing there yet to look at</text>
+        </svg>
+        <p class="visual-caption"><strong>4. You can't peek at words you haven't made up yet.</strong> You're inventing this story as you go — word 5 doesn't exist until you say it, so there's nothing to glance back at. That's the whole idea behind "masked": not a restriction bolted on, just an honest fact about making things up one word at a time.</p>
+      </div>
+      <div class="step" data-step="5">
+        <svg viewBox="0 0 600 140" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Thinking it over privately">
+          <style>.b{fill:var(--accent-soft);stroke:var(--accent);stroke-width:1.5;} .t{font:600 12px -apple-system,sans-serif;fill:var(--ink);} .s{font:400 10px -apple-system,sans-serif;fill:var(--ink-soft);}</style>
+          <rect class="b" x="30" y="35" width="170" height="60" rx="8"></rect>
+          <text class="t" x="115" y="60" text-anchor="middle">what you noticed</text>
+          <text class="s" x="115" y="78" text-anchor="middle">from glancing back (steps 2–4)</text>
+          <text class="t" x="255" y="65" text-anchor="middle">→</text>
+          <rect class="b" x="300" y="35" width="270" height="60" rx="8"></rect>
+          <text class="t" x="435" y="60" text-anchor="middle">a quiet beat to mull it over</text>
+          <text class="s" x="435" y="78" text-anchor="middle">privately, before speaking</text>
+        </svg>
+        <p class="visual-caption"><strong>5. Take a beat to think it over, alone.</strong> After glancing back, you privately mull over what you noticed — no more checking other words this time, just processing it on your own. This habit is called <code>mlp</code>. The next step unpacks exactly what that private mulling-over involves.</p>
+      </div>
+      <div class="step" data-step="6">
+        <svg viewBox="0 0 600 210" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Expand onto a big scratch pad, highlight the useful parts, then compress back down">
+          <style>.b{fill:var(--accent-soft);stroke:var(--accent);stroke-width:1.5;} .big{fill:var(--paper-raised);stroke:var(--rule);stroke-width:1.3;} .hi{fill:var(--good-soft);stroke:var(--good);stroke-width:1.5;} .t{font:600 11px -apple-system,sans-serif;fill:var(--ink);} .s{font:400 9.5px -apple-system,sans-serif;fill:var(--ink-soft);} .arr{stroke:var(--ink-soft);stroke-width:1.5;marker-end:url(#a6);fill:none;}</style>
+          <defs><marker id="a6" markerWidth="7" markerHeight="7" refX="5" refY="3.5" orient="auto"><path d="M0,0 L7,3.5 L0,7 Z" fill="var(--ink-soft)"></path></marker></defs>
+
+          <rect class="b" x="10" y="80" width="90" height="50" rx="6"></rect>
+          <text class="t" x="55" y="100" text-anchor="middle" font-size="10">small note</text>
+          <text class="s" x="55" y="115" text-anchor="middle">(normal size)</text>
+
+          <path class="arr" d="M100,105 L135,105"></path>
+
+          <rect class="big" x="135" y="40" width="180" height="130" rx="6"></rect>
+          <text class="t" x="225" y="58" text-anchor="middle" font-size="10">big scratch pad</text>
+          <text class="s" x="225" y="72" text-anchor="middle">up_proj — expand, more room</text>
+          <rect class="hi" x="150" y="85" width="60" height="18" rx="3"></rect>
+          <rect class="hi" x="150" y="112" width="90" height="18" rx="3"></rect>
+          <rect x="150" y="139" width="70" height="18" rx="3" fill="none" stroke="var(--rule)" stroke-width="1" stroke-dasharray="2,2"></rect>
+          <text class="s" x="225" y="185" text-anchor="middle">highlighted parts kept (gate_proj decides which)</text>
+
+          <path class="arr" d="M315,105 L350,105"></path>
+
+          <rect class="b" x="350" y="80" width="90" height="50" rx="6"></rect>
+          <text class="t" x="395" y="100" text-anchor="middle" font-size="10">small note</text>
+          <text class="s" x="395" y="115" text-anchor="middle">down_proj — compress back</text>
+        </svg>
+        <p class="visual-caption"><strong>6. Expand, highlight, compress.</strong> <code>up_proj</code> blows your note up onto a bigger scratch pad — more room to work with. <code>gate_proj</code> highlights which parts are actually worth keeping (a "gate" lets some information through and blocks the rest, like a dimmer switch). <code>down_proj</code> then condenses the highlighted result back down to normal size before you move on. Three matrices, one job each — the other three names you patched with LoRA in Lesson 0001.</p>
+      </div>
+      <div class="step" data-step="7">
+        <svg viewBox="0 0 600 170" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Repeating the habit many times, then finally speaking the word">
+          <style>.b{fill:var(--paper);stroke:var(--rule);stroke-width:1.3;} .b2{fill:var(--accent-soft);stroke:var(--accent);stroke-width:1.5;} .t{font:600 12px -apple-system,sans-serif;fill:var(--ink);} .s{font:400 10px -apple-system,sans-serif;fill:var(--ink-soft);}</style>
+          <rect class="b" x="20" y="20" width="100" height="35" rx="6"></rect><text class="t" x="70" y="42" text-anchor="middle">round 1</text>
+          <rect class="b" x="20" y="65" width="100" height="35" rx="6"></rect><text class="t" x="70" y="87" text-anchor="middle">round 2</text>
+          <rect class="b" x="20" y="110" width="100" height="35" rx="6"></rect><text class="t" x="70" y="132" text-anchor="middle">⋮ round 28</text>
+          <text class="s" x="70" y="160" text-anchor="middle">glance back + mull it over, repeated</text>
+          <text class="t" x="200" y="90" text-anchor="middle">→</text>
+          <rect class="b2" x="250" y="60" width="150" height="60" rx="8"></rect>
+          <text class="t" x="325" y="85" text-anchor="middle">tidy up</text>
+          <text class="s" x="325" y="103" text-anchor="middle">clean up the numbers</text>
+          <text class="t" x="425" y="90" text-anchor="middle">→</text>
+          <rect class="b2" x="460" y="55" width="130" height="70" rx="8"></rect>
+          <text class="t" x="525" y="80" text-anchor="middle">say the</text>
+          <text class="t" x="525" y="95" text-anchor="middle">next word</text>
+          <text class="s" x="525" y="113" text-anchor="middle">finally speak</text>
+        </svg>
+        <p class="visual-caption"><strong>7. Repeat, then finally speak.</strong> You do "glance back, mull it over" many times in a row (28 times in this model) to really refine your idea — each round wrapped in a quick tidy-up step — before you actually say the next word. That last step is <code>lm_head</code>.</p>
+      </div>
+    </div>
+    <div class="visual-controls">
+      <button class="btn" data-stepper-prev="anatomy-stepper">← Prev</button>
+      <button class="btn primary" data-stepper-next="anatomy-stepper">Next →</button>
+    </div>
+    <p class="step-count" data-stepper-count="anatomy-stepper">Step 1 of 7</p>
+  </div>
+
+  <h2>Reading your own model's printout</h2>
+  <p>When Task 3 runs <code>print(model)</code>, it dumps the real class names for each habit above. Every Llama-family model (yours included) uses this same naming pattern, repeated once per round:</p>
+
+  <div class="code-file">typical Llama decoder block, as it appears in print(model)</div>
+  <pre>(self_attn): LlamaAttention(
+    (q_proj / k_proj / v_proj / o_proj): Linear(...)   <span class="hl">← glancing back, query/key/value/output, masked (steps 2–4)</span>
+)
+(mlp): LlamaMLP(
+    (gate_proj / up_proj / down_proj): Linear(...)     <span class="hl">← expand, highlight, compress (steps 5–6)</span>
+)
+(input_layernorm): LlamaRMSNorm()                       ← tidy up before glancing back
+(post_attention_layernorm): LlamaRMSNorm()               ← tidy up before thinking it over</pre>
+  <p>Outside the repeated rounds, near the top and bottom of the printout, look for <code>embed_tokens</code> (step 1 — making the private note) and <code>lm_head</code> (step 7 — finally speaking). Question #2's example already gives you the three <code>LlamaRMSNorm()</code> lines for free — your job is to find and label the other four using the names above, inside your <em>own</em> printout.</p>
+
+  <div class="box analogy">
+    <span class="box-label">Where "query / key / value" comes from</span>
+    These names are borrowed straight from database vocabulary — the same key-value idea behind a Python dict, or a vector database from earlier sessions. A <strong>query</strong> is what you're searching for; a <strong>key</strong> is what you match against; a <strong>value</strong> is the content sitting behind a matching key. "Output" is simpler — it's just the tidy result after blending the matched values. This isn't a setting you choose: <code>q_proj</code>, <code>k_proj</code>, <code>v_proj</code>, <code>o_proj</code> are four real weight matrices baked into <em>every</em> attention block of <em>every</em> transformer-based model (GPT, Llama, Mistral — all of them), run every single time, no exceptions. <code>gate_proj</code>/<code>up_proj</code>/<code>down_proj</code> (step 6) are three more, specific to Llama's "expand, highlight, compress" style of feed-forward layer — 4 + 3 = <strong>7 total</strong>, exactly the length of Task 3's <code>target_modules</code> list. Not a coincidence: that list is every projection matrix in one block.
+  </div>
+
+  <div class="box citation">
+    <span class="box-label">Where this lives in your notebook</span>
+    <strong>Task 3</strong> — the last line of the cell is <code>print(model)</code>. Scroll its output slowly; the pattern above repeats 28 times (once per decoder block) with only the layer number changing.
+  </div>
+
+  <div class="box callout">
+    <span class="box-label">Primary source</span>
+    <a href="https://arxiv.org/abs/1706.03762" target="_blank" rel="noopener">"Attention Is All You Need"</a> — the original transformer paper. You don't need the full math; Figure 1 alone shows the same repeated shape you just clicked through.
+  </div>
+
+  <div class="ask-agent">
+    💬 Stuck matching a name in your printout to one of these five steps? Paste the confusing line to your teaching agent and ask what it does.
+  </div>
+
+  <div class="lesson-nav">
+    <a href="0001-fine-tuning-and-lora.html">← Fine-Tuning &amp; LoRA</a>
+    <a href="0003-reinforcement-learning-basics.html">Next: Reinforcement Learning Basics →</a>
+  </div>
+</div>
+<script src="../assets/interactions.js"></script>

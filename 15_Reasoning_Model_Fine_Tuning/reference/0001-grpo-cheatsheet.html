@@ -1,0 +1,73 @@
+<title>GRPO Fine-Tuning Cheat Sheet</title>
+<link rel="stylesheet" href="../assets/base.css">
+<div class="page">
+  <div class="crumbs"><a href="../lessons/index.html">← All lessons</a></div>
+  <p class="kicker">Reference · Quick Lookup</p>
+  <h1>Reasoning Model Fine-Tuning Cheat Sheet</h1>
+  <p>The compressed version of Lessons 0000–0006. Use this mid-notebook when you need a fast reminder, not a first explanation — for that, go back to the lessons.</p>
+
+  <h2>The loop, in one line</h2>
+  <pre>prompt → sample group of 8 completions → score each with rewards
+       → compare to group average (advantage) → nudge policy (KL-limited) → repeat</pre>
+
+  <h2>Glossary</h2>
+  <table>
+    <tr><th>Term</th><th>Compressed definition</th></tr>
+    <tr><td><strong>LoRA</strong></td><td>Freeze the big weight matrix <code>W</code>; train two small matrices <code>A</code>, <code>B</code> so the model uses <code>W + BA</code>. Only A/B get gradients.</td></tr>
+    <tr><td><strong>Rank (r)</strong></td><td>How "thin" A and B are. Higher = more trainable capacity, more VRAM/time. This notebook: 64.</td></tr>
+    <tr><td><strong>Quantization</strong></td><td>Storing numbers with fewer bits (rounding). QLoRA = LoRA + 4-bit quantized base weights.</td></tr>
+    <tr><td><strong>Policy</strong></td><td>The model's current tendency to generate certain outputs — literally its current weights, not a rulebook.</td></tr>
+    <tr><td><strong>Reward</strong></td><td>A raw score for one completion, from a reward function.</td></tr>
+    <tr><td><strong>Advantage</strong></td><td>Reward compared to a baseline (expectation). What actually drives the update — not the raw reward.</td></tr>
+    <tr><td><strong>Critic / value network</strong></td><td>A second network PPO trains to estimate the baseline. GRPO replaces this with the group's own average.</td></tr>
+    <tr><td><strong>GRPO</strong></td><td>Group Relative Policy Optimization — sample a group per prompt, use the group's mean reward as the baseline, update with a KL penalty. No critic needed.</td></tr>
+    <tr><td><strong>KL penalty</strong></td><td>A "leash" limiting how far one update can move the policy from where it started — keeps training stable.</td></tr>
+    <tr><td><strong>SFT (supervised fine-tuning)</strong></td><td>Train by copying shown examples of correct behavior. Needs labeled reasoning traces.</td></tr>
+    <tr><td><strong>RL (reinforcement learning)</strong></td><td>Train by scoring attempts and letting the policy improve toward higher scores. Needs only a way to check outcomes.</td></tr>
+    <tr><td><strong>Verifiable reward</strong></td><td>A reward that can be computed by a rule (string/number match) rather than a human or a trained judge — e.g. GSM8K's <code>####</code> answer.</td></tr>
+  </table>
+
+  <h2>LoRA vs. QLoRA — when to reach for each</h2>
+  <table>
+    <tr><th></th><th>16-bit LoRA (this notebook)</th><th>QLoRA (4-bit)</th></tr>
+    <tr><td>Bottleneck it solves</td><td>Generation speed (GRPO samples constantly)</td><td>GPU memory</td></tr>
+    <tr><td>Use when</td><td>vLLM fast-generation is the binding constraint</td><td>The model barely fits in VRAM at all</td></tr>
+  </table>
+
+  <h2>PPO vs. GRPO</h2>
+  <table>
+    <tr><th></th><th>PPO-style RLHF</th><th>GRPO</th></tr>
+    <tr><td>Baseline source</td><td>A trained critic (value) network</td><td>The sampled group's own mean reward</td></tr>
+    <tr><td>Extra network to train</td><td>Yes</td><td>No</td></tr>
+    <tr><td>Sampling per prompt</td><td>Usually 1 completion</td><td>A group (8 here) per prompt</td></tr>
+  </table>
+
+  <h2>Reward function stack (Task 5)</h2>
+  <table>
+    <tr><th>Function</th><th>Checks</th><th>Max</th></tr>
+    <tr><td><code>correctness_reward_func</code></td><td>extracted answer == gold answer</td><td>2.0</td></tr>
+    <tr><td><code>int_reward_func</code></td><td>extracted answer is a plain integer</td><td>0.5</td></tr>
+    <tr><td><code>strict_format_reward_func</code></td><td>exact tag layout with newlines</td><td>0.5</td></tr>
+    <tr><td><code>soft_format_reward_func</code></td><td>tags in order, loosely</td><td>0.5</td></tr>
+    <tr><td><code>xmlcount_reward_func</code></td><td>partial credit per correctly placed tag</td><td>~0.5</td></tr>
+  </table>
+
+  <h2>Key GRPOConfig knobs (Task 6)</h2>
+  <table>
+    <tr><th>Argument</th><th>What it controls</th></tr>
+    <tr><td><code>num_generations</code></td><td>Group size GRPO compares within (8). Lower it (e.g. 4) if out of memory.</td></tr>
+    <tr><td><code>per_device_train_batch_size × gradient_accumulation_steps</code></td><td>Must be evenly divisible by <code>num_generations</code> — the hard batch-geometry rule.</td></tr>
+    <tr><td><code>learning_rate</code></td><td>Size of each update step.</td></tr>
+    <tr><td><code>warmup_ratio</code></td><td>Fraction of training spent easing into the full learning rate.</td></tr>
+    <tr><td><code>lr_scheduler_type</code></td><td>Shape of the learning-rate curve over training (e.g. <code>"cosine"</code> = smooth ramp up, smooth ramp down).</td></tr>
+    <tr><td><code>max_grad_norm</code></td><td>Caps the size of any single update step (separate from the KL penalty).</td></tr>
+  </table>
+
+  <h2>What to watch during training</h2>
+  <p>Loss goes down in SFT. In GRPO, watch <strong>reward</strong> instead — expect it flat/noisy for ~100–150 steps, then a sudden climb (the "Aha moment"). No movement early on is normal, not broken.</p>
+
+  <h2>Before/after (Tasks 8–9)</h2>
+  <p>LoRA never touches the frozen base weights, so one vLLM engine can generate from either: <code>lora_request = None</code> → base model. <code>lora_request = model.load_lora(...)</code> → trained model. <code>model.save_lora(...)</code> writes only the small A/B adapter, not a full checkpoint.</p>
+
+  <p style="margin-top:2rem;"><a href="../lessons/index.html">← Back to lessons</a> if any of these need the full explanation again.</p>
+</div>

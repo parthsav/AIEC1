@@ -1,0 +1,101 @@
+<title>Your Actual Run — Reasoning Model Fine-Tuning</title>
+<link rel="stylesheet" href="../assets/base.css">
+<div class="page">
+
+  <div class="crumbs"><a href="index.html">All lessons</a> · <a href="0010-colab-and-the-assignment.html">← Colab &amp; The Assignment</a> · <a href="../reference/0001-grpo-cheatsheet.html">Cheat sheet</a></div>
+
+  <p class="kicker">Lesson 0011 · Your Actual Run</p>
+  <h1>What You Did, What the Questions Asked, What Came Out</h1>
+
+  <p>Every earlier lesson used the notebook's example data. This one uses <em>yours</em> — your saved <code>ColabVersion__...ipynb</code>, with your GPU, your LoRA stats, and your actual training log.</p>
+
+  <h2>What we actually did</h2>
+  <table>
+    <tr><th>Step</th><th>What happened in your run</th></tr>
+    <tr><td>GPU assigned</td><td>NVIDIA L4, 23.7 GB VRAM, compute capability 8.9 — comfortably meets the Ampere+ requirement</td></tr>
+    <tr><td>Model loaded</td><td><code>unsloth/Llama-3.2-3B-Instruct</code> (the ungated mirror), 16-bit, vLLM fast inference enabled</td></tr>
+    <tr><td>LoRA attached</td><td>Rank 64, all 28 decoder blocks patched (28 QKV + 28 O + 28 MLP layers)</td></tr>
+    <tr><td>Dataset loaded</td><td>7,473 GSM8K training questions, longest prompt 267 tokens</td></tr>
+    <tr><td>Training ran</td><td>175 steps, group size 8, ~46 minutes wall-clock</td></tr>
+    <tr><td>Adapter saved</td><td><code>grpo_saved_lora</code>, then swapped in to compare against the base model</td></tr>
+  </table>
+
+  <div class="visual">
+    <p class="visual-label">Illustration — how much of the model actually trained, for real</p>
+    <div class="stack-bar" style="height:34px;">
+      <div class="stack-seg" style="width:2.94%;background:var(--series-1);"></div>
+    </div>
+    <div class="stack-legend">
+      <div><span class="dot" style="background:var(--series-1)"></span><span>trainable (LoRA)</span> — 97,255,424 params (2.94%)</div>
+      <div><span class="dot" style="background:var(--rule)"></span><span>frozen (base weights)</span> — 3,212,749,824 params (97.06%)</div>
+    </div>
+  </div>
+  <p class="visual-caption">This is the exact number your notebook printed: <code>Trainable parameters = 97,255,424 of 3,310,005,248 (2.94% trained)</code>. That thin colored sliver is Lesson 0001's "sticky note" — made concrete with your own run's real numbers.</p>
+
+  <h2>What the 4 questions were actually trying to ask</h2>
+  <p>Not just what they said — what understanding each one was checking for. Your answers (in the notebook) were strong on all four; here's the intent behind each.</p>
+
+  <table>
+    <tr><th>Question</th><th>What it was really testing</th></tr>
+    <tr><td>Q1 — double quantization</td><td>Whether you understand quantization has a <em>cost</em> (the scaling constants) worth compressing further, and whether you can reason about a real trade-off (memory vs. generation speed) instead of just reciting "16-bit is faster"</td></tr>
+    <tr><td>Q2 — label the diagram</td><td>Whether you can read a real <code>print(model)</code> dump and connect abstract terms (attention, feed-forward) to the actual class names sitting inside your own loaded model</td></tr>
+    <tr><td>Q3 — what is LoRA doing</td><td>Whether you can compress the whole idea (freeze big weight, train two small ones) into your own words without leaning on the notebook's phrasing</td></tr>
+    <tr><td>Q4 — warmup/learning rate/scheduler</td><td>Whether you understand these as a *shape* over the whole run (start gentle, ramp up, ease down) rather than three disconnected settings</td></tr>
+  </table>
+
+  <div class="box citation">
+    <span class="box-label">Worth noting</span>
+    Your Q1 and Q3 answers cite details beyond what any lesson here covered — the NF4 block size of 64, double quantization happening in blocks of 256, and the "low intrinsic rank" hypothesis behind why LoRA works at all. That's evidence you read the actual QLoRA/LoRA papers cited in the notebook, not just these lessons — exactly the kind of primary-source habit <a href="../RESOURCES.md">RESOURCES.md</a> is meant to encourage.
+  </div>
+
+  <h2>What actually came out of the experiment</h2>
+
+  <h3>Training itself: real completions, mid-training</h3>
+  <p>You set <code>report_to = "none"</code>, so there's no plotted reward-over-time chart saved anywhere — the only window into training is the text your own <code>correctness_reward_func</code> printed along the way. Two examples still visible near the very end of your log, right before training finished at step 175:</p>
+
+  <div class="compare">
+    <div class="col yes">
+      <h4>Correct — Leonard's age</h4>
+      Set up two equations, substituted correctly, solved <code>4L + 12 = 36</code> → <code>L = 6</code>. Matched the gold answer, clean <code>&lt;reasoning&gt;</code>/<code>&lt;answer&gt;</code> structure.
+    </div>
+    <div class="col no">
+      <h4>Wrong — bank interest</h4>
+      Computed compound interest wrong (got $2,519.42 instead of the gold $2,400 — treated 8% as compounding rather than simple interest paid out yearly), and the closing <code>&lt;/answer&gt;</code> tag landed in the wrong place.
+    </div>
+  </div>
+  <p class="visual-caption">Even at the very last step, the model still gets some wrong — both on the math itself and occasionally on formatting. That's normal; 175 steps is described in your own notebook as enough to see reward turn upward, not enough for mastery (Unsloth recommends 300+ steps for stronger results).</p>
+
+  <div class="box callout">
+    <span class="box-label">A number that looks confusing: train_loss ≈ 0.0001</span>
+    Your run's final summary shows <code>train_loss: 0.00010429...</code> — a number that low usually means "perfectly solved." Here it doesn't. GRPO's reported "loss" is a policy-gradient surrogate, not a normal prediction-error loss like Lesson 0006 warned about (Lesson 0006: "watch reward go up, not loss go down") — it commonly hovers near zero throughout training and isn't the number to trust for progress. The two real completions above are far more informative than that single number.
+  </div>
+
+  <h3>Before vs. after: the actual comparison</h3>
+  <p>Same prompt, <em>"Calculate pi,"</em> same frozen engine, only the attached adapter changes (Lesson 0006's "two personalities, one engine"):</p>
+
+  <div class="compare">
+    <div class="col no">
+      <h4>Base model (no LoRA, no system prompt)</h4>
+      No tags at all. A rambling, multi-section answer listing four different methods (Monte Carlo, Leibniz, BBP, Chudnovsky) with Python code for each — reasonable content, zero structure.
+    </div>
+    <div class="col yes">
+      <h4>Trained model (LoRA + system prompt)</h4>
+      Reliably produces <code>&lt;reasoning&gt;</code>/<code>&lt;answer&gt;</code> tags, exactly as trained — but the actual digits inside <code>&lt;answer&gt;</code> are garbled and wrong.
+    </div>
+  </div>
+
+  <div class="box citation">
+    <span class="box-label">An honest read of this result</span>
+    This is actually a clean demonstration of exactly what got rewarded and what didn't. <strong>Format</strong> transferred perfectly — the model reliably uses the tags now, on a prompt it never saw in training. <strong>Correctness</strong> didn't, because it can't — GSM8K is whole-number word problems with one exact answer; "calculate pi" asks for an irrational number with infinite digits, a completely different kind of question the reward functions never covered. The training worked exactly as designed; this prompt was just never part of what it practiced.
+  </div>
+
+  <div class="ask-agent">
+    💬 Want to see this more convincingly? Try the same before/after comparison on an actual GSM8K-style word problem instead of "Calculate pi" — ask your teaching agent to help you pick a good test question.
+  </div>
+
+  <div class="lesson-nav">
+    <a href="0010-colab-and-the-assignment.html">← Colab &amp; The Assignment</a>
+    <a href="index.html">Back to all lessons</a>
+  </div>
+</div>
+<script src="../assets/interactions.js"></script>

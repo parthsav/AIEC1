@@ -1,0 +1,366 @@
+<title>Code Walkthrough — Reasoning Model Fine-Tuning</title>
+<link rel="stylesheet" href="../assets/base.css">
+<div class="page">
+
+  <div class="crumbs"><a href="index.html">All lessons</a> · <a href="0007-why-this-matters.html">← Why This Matters</a> · <a href="../reference/0001-grpo-cheatsheet.html">Cheat sheet</a></div>
+
+  <p class="kicker">Lesson 0008 · Code Walkthrough</p>
+  <h1>The Notebook, Objective to Outcome, in Actual Code</h1>
+
+  <p>Every earlier lesson explained one piece in isolation. This one walks straight through the notebook's real code, front to back — what it's trying to do, how each block gets there, and what you actually end up with — then writes the same shape of code for your guitar tabs idea.</p>
+
+  <h2>The objective, in one sentence</h2>
+  <div class="box analogy">
+    <span class="box-label">One sentence</span>
+    Turn <code>Llama-3.2-3B-Instruct</code> — a model that can already chat reasonably — into a model that reliably shows its work and gets grade-school math right, by grading its own self-generated attempts against a hidden answer key, instead of training it to copy a worked solution.
+  </div>
+
+  <div class="visual">
+    <p class="visual-label">Illustration — objective → mechanism → outcome</p>
+    <svg viewBox="0 0 680 190" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Objective flows through four mechanism steps to produce an outcome">
+      <style>
+        .obj { fill: var(--good-soft); stroke: var(--good); stroke-width: 1.5; }
+        .mech { fill: var(--accent-soft); stroke: var(--accent); stroke-width: 1.5; }
+        .out { fill: var(--good-soft); stroke: var(--good); stroke-width: 1.5; }
+        .t { font: 600 11px -apple-system, sans-serif; fill: var(--ink); }
+        .s { font: 400 9.5px -apple-system, sans-serif; fill: var(--ink-soft); }
+        .arr { stroke: var(--ink-soft); stroke-width: 1.5; marker-end: url(#a8); fill: none; }
+      </style>
+      <defs><marker id="a8" markerWidth="7" markerHeight="7" refX="5" refY="3.5" orient="auto"><path d="M0,0 L7,3.5 L0,7 Z" fill="var(--ink-soft)"></path></marker></defs>
+
+      <rect class="obj" x="10" y="70" width="90" height="55" rx="8"></rect>
+      <text class="t" x="55" y="93" text-anchor="middle">Objective</text>
+      <text class="s" x="55" y="108" text-anchor="middle">reason well</text>
+
+      <path class="arr" d="M100,97 L128,97"></path>
+
+      <rect class="mech" x="128" y="20" width="105" height="45" rx="6"></rect>
+      <text class="t" x="180" y="40" text-anchor="middle" font-size="10">1. Load + LoRA</text>
+      <text class="s" x="180" y="55" text-anchor="middle">Task 2–3</text>
+
+      <rect class="mech" x="128" y="72" width="105" height="45" rx="6"></rect>
+      <text class="t" x="180" y="92" text-anchor="middle" font-size="10">2. Dataset</text>
+      <text class="s" x="180" y="107" text-anchor="middle">Task 4</text>
+
+      <rect class="mech" x="128" y="124" width="105" height="45" rx="6"></rect>
+      <text class="t" x="180" y="144" text-anchor="middle" font-size="10">3. Rewards</text>
+      <text class="s" x="180" y="159" text-anchor="middle">Task 5</text>
+
+      <rect class="mech" x="248" y="72" width="105" height="45" rx="6"></rect>
+      <text class="t" x="300" y="92" text-anchor="middle" font-size="10">4. Train</text>
+      <text class="s" x="300" y="107" text-anchor="middle">Task 6–7</text>
+
+      <path class="arr" d="M353,97 L385,97"></path>
+
+      <rect class="out" x="385" y="70" width="110" height="55" rx="8"></rect>
+      <text class="t" x="440" y="93" text-anchor="middle">Outcome</text>
+      <text class="s" x="440" y="108" text-anchor="middle">a small LoRA file</text>
+
+      <text class="s" x="580" y="90" text-anchor="middle" font-size="10">Task 8–9:</text>
+      <text class="s" x="580" y="105" text-anchor="middle" font-size="10">swap it in,</text>
+      <text class="s" x="580" y="120" text-anchor="middle" font-size="10">compare before/after</text>
+      <path class="arr" d="M495,97 L545,97"></path>
+    </svg>
+  </div>
+  <p class="visual-caption">Four mechanism steps sit between the objective and the outcome. Below is the actual code for each, straight from your notebook.</p>
+
+  <div class="box callout">
+    <span class="box-label">New to Python? Five patterns you'll see over and over below</span>
+    <ul style="margin:0.3rem 0 0; padding-left:1.2rem;">
+      <li><strong>List comprehension</strong> — <code>[f(x) for x in items]</code> means "for each <code>x</code> in <code>items</code>, compute <code>f(x)</code>, and collect the results into a new list." It's a for-loop squeezed onto one line.</li>
+      <li><strong>Inline if/else</strong> — <code>2.0 if r == a else 0.0</code> means "use 2.0 if this is true, otherwise use 0.0." It produces a value, unlike a normal if-statement.</li>
+      <li><strong><code>zip(a, b)</code></strong> — walks two lists side by side, pairing up item 1 with item 1, item 2 with item 2, and so on.</li>
+      <li><strong><code>**kwargs</code></strong> — means "accept any other named settings this function doesn't explicitly ask for, and don't complain." You can ignore it; it's just there so the function doesn't break when it's handed extra information it doesn't need.</li>
+      <li><strong>Regex</strong> (<code>re.match(pattern, ...)</code>) — a mini pattern-matching language for text. <code>.*?</code> means "any characters, as few as possible"; <code>\n</code> means "a line break."</li>
+    </ul>
+  </div>
+
+  <h2>1. Load the model, attach LoRA</h2>
+  <div class="code-file">Task 2–3</div>
+  <pre># Load the frozen base model, with vLLM enabled for fast group sampling.
+model, tokenizer = FastLanguageModel.from_pretrained(
+    model_name = "meta-llama/Llama-3.2-3B-Instruct",
+    max_seq_length = 2048,
+    load_in_4bit = False,       # 16-bit — see Lesson 0001
+    fast_inference = True,      # vLLM, for fast group sampling
+    max_lora_rank = 64,
+)
+
+# Patch small trainable LoRA adapters onto seven weight matrices per block.
+model = FastLanguageModel.get_peft_model(
+    model,
+    r = 64,                     # LoRA rank — see Lesson 0001
+    target_modules = [
+        "q_proj", "k_proj", "v_proj", "o_proj",
+        "gate_proj", "up_proj", "down_proj",
+    ],
+    lora_alpha = 64,
+)</pre>
+  <p>Two function calls. The first loads the frozen base model; the second patches seven weight matrices per block with small trainable LoRA adapters — everything from Lesson 0001 and Lesson 0002, as actual code.</p>
+
+  <h2>2. Build a dataset with a checkable answer</h2>
+  <p>This is the part that confused you before, so let's use one real question from GSM8K, start to finish, with real text.</p>
+
+  <div class="box analogy">
+    <span class="box-label">What is GSM8K, exactly? Not a model — a dataset</span>
+    GSM8K is a <strong>dataset</strong>: a fixed, already-written collection of text, sitting on the internet, ready to download. Specifically, about 8,000 grade-school math word problems (that's what "8K" means — <strong>G</strong>rade <strong>S</strong>chool <strong>M</strong>ath, ~<strong>8</strong>,000 problems), each written by a real person with a worked solution and final answer, published by researchers at OpenAI in 2021. Think of it like a textbook of practice problems with an answer key already printed at the back — nobody in this notebook writes new problems; <code>load_dataset("openai/gsm8k", "main")</code> just downloads this exact, pre-existing, publicly shared collection, the same one thousands of other people use.
+  </div>
+
+  <div class="box callout">
+    <span class="box-label">What does "gold" mean?</span>
+    In ML, a <strong>gold answer</strong> (or "gold label") is just jargon for <em>the correct reference answer, used to check an attempt against</em> — like the answer key printed at the back of a textbook. The name comes from "gold standard": the trusted reference everything else gets measured against. Every GSM8K question already comes with one, buried inside its raw <code>"answer"</code> field, after <code>####</code>.
+  </div>
+
+  <div class="code-file">the raw data — before this notebook touches it</div>
+  <pre>{
+  "question": "Natalia sold clips to 48 of her friends in April, and then she
+                sold half as many clips in May. How many clips did Natalia
+                sell altogether in April and May?",
+  "answer":   "Natalia sold 48/2 = &lt;&lt;48/2=24&gt;&gt;24 clips in May.
+                Natalia sold 48+24 = &lt;&lt;48+24=72&gt;&gt;72 clips altogether in
+                April and May.
+                #### 72"
+}</pre>
+  <p>That's a real row from the GSM8K dataset. Notice the <code>"answer"</code> field is messy — it has full sentences <em>and</em> odd <code>&lt;&lt;48/2=24&gt;&gt;</code> markers (GSM8K's own way of showing a calculator step). The notebook doesn't want any of that. It only wants the number after <code>####</code>: <strong>72</strong>.</p>
+
+  <pre># Pull out ONLY the gold number after "####" — throw away everything else,
+# including all the reasoning sentences and calculator markers above.
+def extract_hash_answer(text):
+    if "####" not in text:
+        return None
+    return text.split("####")[1].strip()   # text.split("####") -> ["...", " 72"], take [1], then trim spaces
+
+# Load GSM8K and reshape every row into just: a prompt to send the model,
+# and the one gold number to check its answer against.
+def get_gsm8k_questions(split="train"):
+    data = load_dataset("openai/gsm8k", "main")[split]
+    data = data.map(lambda x: {
+        "prompt": [
+            {"role": "system", "content": SYSTEM_PROMPT},   # ask for &lt;reasoning&gt;/&lt;answer&gt; tags
+            {"role": "user", "content": x["question"]},
+        ],
+        "answer": extract_hash_answer(x["answer"]),
+    })
+    return data
+
+dataset = get_gsm8k_questions()</pre>
+  <p>GSM8K's training split has <strong>7,473 rows</strong> like the Natalia one above — real grade-school math questions written by humans, each already carrying its own gold answer. <code>.map()</code> is what does the reshaping: it runs that same <code>lambda</code> function over all 7,473 rows, one at a time, and hands back a new dataset of 7,473 rows in the new shape below. This all happens <em>once</em>, before training even starts — not during it.</p>
+
+  <div class="code-file">what the model actually trains on — after this notebook processes it</div>
+  <pre>{
+  "prompt": [
+    {"role": "system", "content": "Respond in the following format:
+                                    &lt;reasoning&gt; ... &lt;/reasoning&gt;
+                                    &lt;answer&gt; ... &lt;/answer&gt;"},
+    {"role": "user",   "content": "Natalia sold clips to 48 of her friends in
+                                    April, and then she sold half as many
+                                    clips in May. How many clips did Natalia
+                                    sell altogether in April and May?"}
+  ],
+  "answer": "72"
+}</pre>
+  <p>All the reasoning sentences and calculator markers are gone. All that survives is the question and the single gold number <strong>72</strong> — exactly Lesson 0003's point, now visible in real data: the model is never shown <em>how</em> to solve it, only given something to check its guess against.</p>
+
+  <h3>How grading actually happens</h3>
+  <p>During training, the model generates 8 different attempts at this exact question (the "group of 8" from Lesson 0004). Say one attempt comes back as:</p>
+  <pre>&lt;reasoning&gt;
+She sold half of 48 in May, which is 24. 48 + 24 = 72.
+&lt;/reasoning&gt;
+&lt;answer&gt;
+72
+&lt;/answer&gt;</pre>
+  <p>The reward function (next section) pulls the text between <code>&lt;answer&gt;</code> and <code>&lt;/answer&gt;</code> — <strong>"72"</strong> — and compares it to the gold answer stored earlier — also <strong>"72"</strong>. They match, so this attempt earns the full 2.0 correctness reward. If another one of the 8 attempts said <code>&lt;answer&gt;96&lt;/answer&gt;</code> instead, the comparison would fail and that attempt would earn 0.0 for correctness — even if its formatting were perfect.</p>
+
+  <h3>How the gold number actually reaches the reward function</h3>
+  <p>This is the piece that ties section 2 to section 3, and it's easy to miss. Look at two things side by side: the processed dataset row above has a field called <code>"answer"</code>. The reward function below (<code>correctness_reward_func</code>) has a parameter also called <code>answer</code>. <strong>That's not a coincidence — it's the entire mechanism.</strong></p>
+
+  <div class="visual">
+    <p class="visual-label">Illustration — matched by name, not by you writing any glue code</p>
+    <svg viewBox="0 0 640 160" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="The dataset's answer column is automatically matched to the reward function's answer parameter by GRPOTrainer, by name">
+      <style>
+        .b { fill: var(--accent-soft); stroke: var(--accent); stroke-width: 1.5; }
+        .b2 { fill: var(--good-soft); stroke: var(--good); stroke-width: 1.5; }
+        .t { font: 600 11px -apple-system, sans-serif; fill: var(--ink); }
+        .s { font: 400 9.5px -apple-system, sans-serif; fill: var(--ink-soft); }
+        .arr { stroke: var(--good); stroke-width: 2; marker-end: url(#a9); fill: none; }
+      </style>
+      <defs><marker id="a9" markerWidth="7" markerHeight="7" refX="5" refY="3.5" orient="auto"><path d="M0,0 L7,3.5 L0,7 Z" fill="var(--good)"></path></marker></defs>
+
+      <rect class="b" x="20" y="20" width="220" height="55" rx="8"></rect>
+      <text class="t" x="130" y="42" text-anchor="middle" font-size="10">dataset row: {"answer": "72"}</text>
+      <text class="s" x="130" y="60" text-anchor="middle">a column named "answer"</text>
+
+      <rect class="b" x="400" y="20" width="220" height="55" rx="8"></rect>
+      <text class="t" x="510" y="42" text-anchor="middle" font-size="10">def correctness_reward_func(</text>
+      <text class="s" x="510" y="60" text-anchor="middle">..., answer, **kwargs)</text>
+
+      <rect class="b2" x="180" y="100" width="280" height="45" rx="8"></rect>
+      <text class="t" x="320" y="120" text-anchor="middle" font-size="10">GRPOTrainer matches these by name</text>
+      <text class="s" x="320" y="135" text-anchor="middle">and fills the parameter in for you</text>
+
+      <path class="arr" d="M130,75 C130,95 250,100 250,100"></path>
+      <path class="arr" d="M510,75 C510,95 390,100 390,100"></path>
+    </svg>
+  </div>
+  <p class="visual-caption">You never call <code>correctness_reward_func("72")</code> yourself, and you never type "72" anywhere. <code>GRPOTrainer</code> sees the dataset has a column named <code>answer</code>, sees the reward function has a parameter also named <code>answer</code>, and automatically passes that row's value in — once per row, every training step, for the whole 7,473-row dataset.</p>
+
+  <pre># dataset row: {"prompt": [...], "answer": "72"}
+# GRPOTrainer inspects correctness_reward_func's parameters and finds "answer" —
+# a name that matches a column in the dataset — so it fills that argument in for you:
+correctness_reward_func(prompts=[...], completions=[...], answer=["72", "72", "72", ...])
+#                                                          ^^^^^^ came straight from the dataset row</pre>
+  <p>This is also why <code>strict_format_reward_func</code> only takes <code>completions</code> and <code>**kwargs</code> — it doesn't need the gold answer at all, since it's only checking shape, not correctness. Each reward function only asks for the exact pieces of the row it actually needs.</p>
+
+  <h2>3. Score attempts with reward functions</h2>
+  <div class="code-file">Task 5 (trimmed to the two that matter most)</div>
+  <pre># Pull just the text between &lt;answer&gt; and &lt;/answer&gt; out of a completion.
+def extract_xml_answer(text):
+    answer = text.split("&lt;answer&gt;")[-1]     # everything after the LAST "&lt;answer&gt;"
+    return answer.split("&lt;/answer&gt;")[0].strip()   # everything before "&lt;/answer&gt;", trimmed
+
+# The big reward: 2.0 if the model's answer matches the gold answer, else 0.0.
+def correctness_reward_func(prompts, completions, answer, **kwargs):
+    responses = [c[0]["content"] for c in completions]       # the raw text of each of the 8 attempts
+    extracted = [extract_xml_answer(r) for r in responses]   # just the &lt;answer&gt; text from each one
+    return [2.0 if r == a else 0.0 for r, a in zip(extracted, answer)]
+
+# A small reward: 0.5 if the completion matches the exact expected layout.
+def strict_format_reward_func(completions, **kwargs):
+    pattern = r"^&lt;reasoning&gt;\n.*?\n&lt;/reasoning&gt;\n&lt;answer&gt;\n.*?\n&lt;/answer&gt;\n$"
+    responses = [c[0]["content"] for c in completions]
+    matches = [re.match(pattern, r, flags=re.DOTALL) for r in responses]
+    return [0.5 if m else 0.0 for m in matches]</pre>
+  <p>Every reward function has the same shape: take a batch of completions, return a list of numbers. <code>GRPOTrainer</code> adds all five functions' outputs together — Lesson 0005's whole stacked-bar illustration, as code. Using the Natalia example above, <code>correctness_reward_func</code> would return <code>2.0</code> for the "72" attempt.</p>
+
+  <h2>4. Configure GRPO and train</h2>
+  <div class="code-file">Task 6–7</div>
+  <pre># All the knobs for how training runs — group size, learning rate, how long to train.
+training_args = GRPOConfig(
+    learning_rate = 5e-6,
+    num_generations = 8,                    # group size — Lesson 0004
+    per_device_train_batch_size = 1,
+    gradient_accumulation_steps = 8,        # 1 x 8 divisible by 8 — the batch-geometry rule
+    max_steps = 175,
+)
+
+# Wire the model, the dataset, and all five reward functions together.
+trainer = GRPOTrainer(
+    model = model,
+    reward_funcs = [
+        xmlcount_reward_func, soft_format_reward_func,
+        strict_format_reward_func, int_reward_func,
+        correctness_reward_func,
+    ],
+    args = training_args,
+    train_dataset = dataset,
+)
+trainer.train()   # actually runs the loop: sample a group, score, compare to average, nudge — 175 times</pre>
+  <p>This is the only line that actually changes any weights: <code>trainer.train()</code>. Everything before it was setup — the model, the data, the reward. This is where Lesson 0004's loop actually runs, 175 times, once per question like the Natalia example above.</p>
+
+  <h2>The outcome</h2>
+  <div class="code-file">Task 8–9</div>
+  <pre># Save just the small trained adapter — not a full copy of the model.
+model.save_lora("grpo_saved_lora")   # a few hundred MB — just the A/B matrices
+
+# Generate again, this time with the trained adapter attached.
+trained_output = model.fast_generate(
+    text,
+    sampling_params = sampling_params,
+    lora_request = model.load_lora("grpo_saved_lora"),
+)</pre>
+  <p>You don't get a new model file. You get a small adapter that, attached to the same frozen base weights, makes the model reliably produce <code>&lt;reasoning&gt;</code>/<code>&lt;answer&gt;</code> output and get more GSM8K problems right than it did before training — Lesson 0006's "two personalities on one engine," as actual code.</p>
+
+  <h2>Now: the exact same code shape, for your guitar tabs idea</h2>
+  <p>Four sections, same order, same function signatures. What's different is the <em>content</em> of the dataset and reward functions — not the scaffolding around them.</p>
+
+  <div class="box citation">
+    <span class="box-label">Marked clearly: illustrative, not runnable</span>
+    The functions named <code>render_audio_from_tab</code>, <code>compare_audio</code>, and <code>is_playable</code> below don't exist anywhere — you'd have to build them (real audio-processing work). Everything else — the overall shape, <code>GRPOConfig</code>, <code>GRPOTrainer</code> — is copy-paste real, exactly as shown above.
+  </div>
+
+  <h3>1. Load an audio-capable model, attach LoRA</h3>
+  <pre># Same idea as the notebook — just point at a model that can already "listen."
+model, processor = FastAudioModel.from_pretrained(
+    model_name = "some/audio-transcription-base-model",   # see Lesson 0007
+    max_seq_length = 2048,
+    load_in_4bit = False,
+)
+
+# Patch LoRA onto this model's own attention/feed-forward layers.
+model = FastAudioModel.get_peft_model(
+    model,
+    r = 64,
+    target_modules = [...],    # whatever this model's layers happen to be called
+    lora_alpha = 64,
+)</pre>
+
+  <h3>2. Build a dataset — but keep the ORIGINAL AUDIO instead of a gold tab</h3>
+  <pre># Reshape every row into: a prompt (the audio clip), and the clip itself
+# kept around to check guesses against later — no hand-written gold tab needed.
+def get_guitar_clips_dataset(split="train"):
+    data = load_dataset("your-name/guitar-riff-clips")[split]
+    data = data.map(lambda x: {
+        "prompt": [
+            {"role": "system", "content": TAB_SYSTEM_PROMPT},   # ask for structured tab notation
+            {"role": "user", "content": x["audio_clip"]},
+        ],
+        "original_audio": x["audio_clip"],   # the clip itself IS the answer key — see below
+    })
+    return data
+
+dataset = get_guitar_clips_dataset()</pre>
+  <p>Same shape as <code>get_gsm8k_questions()</code> above — a prompt, plus one field to check the answer against later. GSM8K's checkable field was a number; here it's the raw audio itself.</p>
+
+  <h3>3. Reward: does it sound right, and is it playable?</h3>
+  <pre># The big reward: play back the guessed notes, and check how close that
+# sounds to the real original clip. No human ever labels anything.
+def sounds_right_reward_func(prompts, completions, original_audio, **kwargs):
+    guesses = [extract_tab(c[0]["content"]) for c in completions]
+    rewards = []
+    for guess, real_clip in zip(guesses, original_audio):
+        resynthesized = render_audio_from_tab(guess)         # play back the guessed notes
+        similarity = compare_audio(resynthesized, real_clip) # 0.0-1.0, how close it sounds
+        rewards.append(similarity * 2.0)                      # scaled like correctness_reward_func
+    return rewards
+
+# A small reward: is this even a real, playable guitar tab?
+def playable_format_reward_func(completions, **kwargs):
+    tabs = [extract_tab(c[0]["content"]) for c in completions]
+    return [0.5 if is_playable(tab) else 0.0 for tab in tabs]   # like strict_format_reward_func</pre>
+
+  <h3>4. Configure GRPO and train — nearly identical</h3>
+  <pre>training_args = GRPOConfig(
+    learning_rate = 5e-6,
+    num_generations = 8,                 # 8 tab guesses per clip, same idea
+    per_device_train_batch_size = 1,
+    gradient_accumulation_steps = 8,
+    max_steps = 300,
+)
+
+trainer = GRPOTrainer(
+    model = model,
+    reward_funcs = [playable_format_reward_func, sounds_right_reward_func],
+    args = training_args,
+    train_dataset = dataset,
+)
+trainer.train()</pre>
+
+  <h3>Outcome</h3>
+  <pre>model.save_lora("guitar_tab_lora")   # same idea — a small adapter, not a new model</pre>
+  <p>Same as the notebook: not a new model, a small adapter. Attached to the frozen audio base model, it should now guess guitar tabs from a clip noticeably better than before training — the exact same "outcome" shape as Lesson 0006, just in a different domain.</p>
+
+  <div class="box callout">
+    <span class="box-label">Primary source</span>
+    Re-read <a href="0006-training-and-results.html">Lesson 0006</a> and <a href="0007-why-this-matters.html">Lesson 0007</a> side by side with this one — this lesson is those two, made literal as code.
+  </div>
+
+  <div class="ask-agent">
+    💬 Want to actually start building the guitar tabs version? Ask your teaching agent to help pick a real starting audio model and sketch out <code>render_audio_from_tab</code> — that's genuinely new engineering, not something covered in this notebook.
+  </div>
+
+  <div class="lesson-nav">
+    <a href="0007-why-this-matters.html">← Why This Matters</a>
+    <a href="0009-designing-rewards-without-ground-truth.html">Next: Designing Rewards Without Ground Truth →</a>
+  </div>
+</div>
+<script src="../assets/interactions.js"></script>

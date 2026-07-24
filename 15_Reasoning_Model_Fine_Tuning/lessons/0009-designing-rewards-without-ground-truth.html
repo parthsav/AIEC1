@@ -1,0 +1,95 @@
+<title>Designing Rewards Without Ground Truth — Reasoning Model Fine-Tuning</title>
+<link rel="stylesheet" href="../assets/base.css">
+<div class="page">
+
+  <div class="crumbs"><a href="index.html">All lessons</a> · <a href="0008-code-walkthrough.html">← Code Walkthrough</a> · <a href="../reference/0001-grpo-cheatsheet.html">Cheat sheet</a></div>
+
+  <p class="kicker">Lesson 0009 · Designing Rewards Without Ground Truth</p>
+  <h1>What If You Don't Know What "Good" Is?</h1>
+
+  <p>Every reward function so far checked against something exact: GSM8K's gold number. Most real tasks aren't that lucky. This lesson is about what to do when there's no clean answer key to check against.</p>
+
+  <div class="box analogy">
+    <span class="box-label">Analogy — a callback to the food critic (Lesson 0003)</span>
+    What if there's no food critic at all, and you've never eaten a genuinely great version of the dish yourself — you have no idea what "good" tastes like? You're stuck... unless someone can still tell you <strong>"I liked plate A better than plate B."</strong> That one comparison, repeated many times, is enough to learn from — even without ever writing down what "good" means in the abstract. That's the whole trick this lesson is about.
+  </div>
+
+  <h2>The spectrum: how exact does your reward need to be?</h2>
+  <div class="visual">
+    <p class="visual-label">Illustration — from exact ground truth to no signal at all</p>
+    <svg viewBox="0 0 700 260" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="A spectrum from exact ground truth rewards through proxy signals, pairwise comparison, LLM judges, to no usable signal at all">
+      <style>
+        .stop { fill: var(--paper-raised); stroke: var(--rule); stroke-width: 1.3; }
+        .best { fill: var(--good-soft); stroke: var(--good); stroke-width: 1.5; }
+        .worst { fill: var(--bad-soft); stroke: var(--bad); stroke-width: 1.5; }
+        .t { font: 600 11px -apple-system, sans-serif; fill: var(--ink); }
+        .s { font: 400 9.5px -apple-system, sans-serif; fill: var(--ink-soft); }
+        .line { stroke: var(--rule); stroke-width: 2; }
+      </style>
+      <line class="line" x1="40" y1="130" x2="660" y2="130"></line>
+
+      <rect class="best" x="10" y="30" width="130" height="70" rx="8"></rect>
+      <text class="t" x="75" y="55" text-anchor="middle" font-size="10">Exact ground truth</text>
+      <text class="s" x="75" y="72" text-anchor="middle">GSM8K's gold number,</text>
+      <text class="s" x="75" y="85" text-anchor="middle">code tests pass/fail</text>
+
+      <rect class="stop" x="155" y="30" width="130" height="70" rx="8"></rect>
+      <text class="t" x="220" y="55" text-anchor="middle" font-size="10">Imperfect proxy</text>
+      <text class="s" x="220" y="72" text-anchor="middle">"does resynthesized</text>
+      <text class="s" x="220" y="85" text-anchor="middle">audio sound similar?"</text>
+
+      <rect class="stop" x="300" y="30" width="130" height="70" rx="8"></rect>
+      <text class="t" x="365" y="50" text-anchor="middle" font-size="10">Pairwise comparison</text>
+      <text class="s" x="365" y="67" text-anchor="middle">"A is better than B"</text>
+      <text class="s" x="365" y="80" text-anchor="middle">(RLHF's whole trick)</text>
+
+      <rect class="stop" x="445" y="30" width="130" height="70" rx="8"></rect>
+      <text class="t" x="510" y="55" text-anchor="middle" font-size="10">LLM as judge</text>
+      <text class="s" x="510" y="72" text-anchor="middle">a rubric in plain</text>
+      <text class="s" x="510" y="85" text-anchor="middle">English, scored by AI</text>
+
+      <rect class="worst" x="590" y="30" width="90" height="70" rx="8"></rect>
+      <text class="t" x="635" y="60" text-anchor="middle" font-size="10">No signal</text>
+      <text class="s" x="635" y="77" text-anchor="middle">can't do this</text>
+
+      <text class="s" x="350" y="150" text-anchor="middle">easiest to trust →</text>
+      <text class="s" x="350" y="165" text-anchor="middle">hardest to trust, but still usable, all the way until "no signal"</text>
+    </svg>
+  </div>
+  <p class="visual-caption">You don't need to be all the way on the left. Most real tasks live in the middle three stops — and that's still enough to train on.</p>
+
+  <h2>The trick in the middle: comparing beats scoring</h2>
+  <p>Humans are bad at absolute scores ("rate this joke 1–10") but good at comparisons ("which of these two is funnier"). <strong>RLHF (Reinforcement Learning from Human Feedback)</strong> is built entirely on that one observation:</p>
+  <ol>
+    <li>Show people pairs of model outputs, ask which one is better.</li>
+    <li>Train a small model — a <strong>reward model</strong> — to imitate that preference on new pairs it hasn't seen.</li>
+    <li>Use that trained reward model as the automatic scorer, exactly where <code>correctness_reward_func</code> sat in your notebook.</li>
+  </ol>
+  <p>This is literally how ChatGPT was first trained: nobody wrote a formula for "a good, helpful reply." People just compared pairs, and a reward model learned to imitate their preferences.</p>
+
+  <h2>Your guitar tabs idea, revisited</h2>
+  <p>Notice the "does resynthesized audio sound similar" reward from Lessons 0007–0008 already lives on this spectrum — it's the <strong>imperfect proxy</strong> stop, not the exact-ground-truth stop. You never claimed to know the "perfect" tab; you just built something checkable that correlates with good. That's normal, and it's usually enough.</p>
+
+  <div class="box callout">
+    <span class="box-label">The catch: reward hacking</span>
+    Whatever proxy you pick, the model will find every loophole in it, not just the path you intended. If "sounds similar" is the whole reward, the model might discover some acoustic trick that scores well without producing an actual playable tab. This is why the notebook <em>stacks</em> multiple reward functions (format + correctness together) instead of trusting one — closing loopholes is most of the real skill in reward design, more than picking one clever measure.
+  </div>
+
+  <h2>The honest limit</h2>
+  <p>If truly nothing — no rule, no human, no model — can tell a good attempt from a bad one, even roughly, this whole family of techniques (GRPO, RLHF, all of it) has nothing to climb toward. That's a real boundary, not a failure of imagination. It's rare in practice — almost every task has <em>some</em> usable signal once you stop insisting on a perfect one — but it does exist, and it's worth recognizing rather than forcing a bad proxy onto a task that has no honest signal at all.</p>
+
+  <div class="box callout">
+    <span class="box-label">Primary source</span>
+    <a href="https://arxiv.org/abs/1706.03741" target="_blank" rel="noopener">Christiano et al., "Deep Reinforcement Learning from Human Preferences"</a> (2017) — the original paper behind the pairwise-comparison trick. <a href="https://arxiv.org/abs/2203.02155" target="_blank" rel="noopener">Ouyang et al., "Training language models to follow instructions with human feedback"</a> (2022, the InstructGPT paper) — how this was actually applied to build the model behind ChatGPT.
+  </div>
+
+  <div class="ask-agent">
+    💬 Have a task in mind where you're not sure what "good" even means? Describe it to your teaching agent — figuring out where it sits on this spectrum is usually the fastest way to see if it's trainable at all.
+  </div>
+
+  <div class="lesson-nav">
+    <a href="0008-code-walkthrough.html">← Code Walkthrough</a>
+    <a href="0010-colab-and-the-assignment.html">Next: Colab &amp; The Assignment →</a>
+  </div>
+</div>
+<script src="../assets/interactions.js"></script>
