@@ -4,15 +4,15 @@
 
 ## Before you hit record (not part of the timing, nothing here is spoken)
 
-All screen-share moments point at **`ColabVersion__01_Reasoning_Fine_Tuning_Unsloth_GRPO.ipynb`** — that's the file with your real executed output, not the local `01_...ipynb`. Open it and pre-scroll to these three spots so you're not hunting live:
+All screen-share moments point at **`ColabVersion__01_Reasoning_Fine_Tuning_Unsloth_GRPO.ipynb`** — that's the file with your real executed output, not the local `01_...ipynb`. Colab doesn't show "cell 37"-style numbers — it shows an execution count like `[15]` to the left of each code cell that's been run, and cells are otherwise identified by which section they sit under. Use both together; here's exactly where each one is, top to bottom of the notebook:
 
-- **Cell 37** (`trainer = GRPOTrainer(...); trainer.train()`) — this cell's output is long. You need two different scroll positions out of it:
+- **`In [15]`**, under the **"Task 7: Train with GRPOTrainer"** heading, the cell starting `trainer = GRPOTrainer(` — this is the long-running training cell, and its output is long too. You need two scroll positions inside it:
   - **The very top** of its output: the Unsloth banner starting `==((====))==`, specifically the line `Trainable parameters = 97,255,424 of 3,310,005,248 (2.94% trained)`.
-  - **The very bottom** of its output: the last line, `TrainOutput(global_step=175, ..., 'train_runtime': 2770.8361, ...)` — this is your 175-steps / ~46-minute confirmation.
-- **Cell 39** — `base_output = model.fast_generate(...)` with `lora_request = None`. This is the "before" — the rambling, untagged pi answer.
-- **Cell 42** — `trained_output = model.fast_generate(...)` with `lora_request = model.load_lora(...)`. This is the "after" — the `<reasoning>`/`<answer>`-tagged pi answer.
+  - **The very bottom** of its output: the last line, `TrainOutput(global_step=175, ..., 'train_runtime': 2770.8361, ...)` — your 175-steps / ~46-minute confirmation.
+- **`In [16]`**, under **"Task 8: Compare Before and After"**, the cell starting `from vllm import SamplingParams` — this produces `base_output`, the "before" — the rambling, untagged pi answer.
+- **`In [18]`**, under **"Task 9: Save and Load the LoRA"** (the very last code cell in the notebook), starting `text = tokenizer.apply_chat_template(` — this produces `trained_output`, the "after" — the `<reasoning>`/`<answer>`-tagged pi answer.
 
-Optional, if you want a fourth visual: **Cell 17**'s `print(model)` output shows the actual `lora_A`/`lora_B` matrices wrapping each frozen layer — the literal picture behind "freeze the giant matrix, train two tiny ones" at 2:45.
+Optional, if you want a fourth visual: **`In [6]`**, under **"Task 3: Attach LoRA Adapters"**, the cell starting `model = FastLanguageModel.get_peft_model(` — its `print(model)` output shows the actual `lora_A`/`lora_B` matrices wrapping each frozen layer, the literal picture behind "freeze the giant matrix, train two tiny ones" at 2:45.
 
 ---
 
@@ -38,9 +38,9 @@ Optional, if you want a fourth visual: **Cell 17**'s `print(model)` output shows
 ## 2:45–3:45 — What actually came out of it
 
 **SAY:**
-> "[Show Cell 37, scrolled to the TOP of its output — the 'Trainable parameters = 97,255,424 of 3,310,005,248 (2.94% trained)' line] It ran 175 steps on an L4 GPU, about 46 minutes [optionally scroll to the BOTTOM of Cell 37's output here to show the `TrainOutput(global_step=175, ...)` line confirming that]. The number that stuck with me most: only 2.94% of the model's parameters were ever touched. Everything else stayed frozen. That's LoRA — freeze the giant matrix, train two tiny ones, and the correction they produce is enough to change behavior.
+> "[Show `In [15]`'s output, scrolled to the TOP — the 'Trainable parameters = 97,255,424 of 3,310,005,248 (2.94% trained)' line] It ran 175 steps on an L4 GPU, about 46 minutes [optionally scroll to the BOTTOM of that same `In [15]` output here to show the `TrainOutput(global_step=175, ...)` line confirming that]. The number that stuck with me most: only 2.94% of the model's parameters were ever touched. Everything else stayed frozen. That's LoRA — freeze the giant matrix, train two tiny ones, and the correction they produce is enough to change behavior.
 
-> [Show Cell 39's output — the base model's response] Before training: I asked it to calculate pi and got a rambling wall of text with no structure. [Switch to Cell 42's output — the trained model's response] After: same prompt, same frozen weights, just a different adapter swapped in — and it reliably used the reasoning-and-answer format I trained it toward. The actual digits were garbage, honestly, but that's fair — pi was never part of what it practiced on. The format transferred. The math didn't, because it was never supposed to."
+> [Show `In [16]`'s output — the base model's response] Before training: I asked it to calculate pi and got a rambling wall of text with no structure. [Switch to `In [18]`'s output — the trained model's response] After: same prompt, same frozen weights, just a different adapter swapped in — and it reliably used the reasoning-and-answer format I trained it toward. The actual digits were garbage, honestly, but that's fair — pi was never part of what it practiced on. The format transferred. The math didn't, because it was never supposed to."
 
 ## 3:45–4:45 — What I'm taking away from this
 
